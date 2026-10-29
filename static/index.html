@@ -594,7 +594,7 @@ function updatePlanBtn() {
   $('#planBtn').textContent = P.edl ? (locked ? `Regenerate (keep ${locked} 🔒)` : 'Regenerate plan') : 'Generate plan';
   $('#planHint').textContent = P.edl ? 'Lock 🔒 the good cuts — the AI only redoes the rest.' : '';
 }
-const clipDur = c => c.in != null ? c.out - c.in : (c.duration || 2.5);
+const clipDur = c => c.in != null ? (c.out - c.in) / (c.speed || 1) : (c.duration || 2.5);
 function renderPlan() {
   const area = $('#planArea');
   updatePlanBtn();
@@ -696,7 +696,7 @@ function clipRow(c, i) {
     <div class="ix">${i + 1}</div>
     <img src="${thumb(c.source)}" alt="">
     <div><div class="src" title="${esc(c.source)}">${esc(c.source)}</div>
-      <div class="hint">${c.in != null ? `${fmt(c.in)}–${fmt(c.out)}s` : 'photo'} · ${fmt(clipDur(c))}s · ${c.fit === 'blur_pad' ? 'blurred' : 'crop'}</div>
+      <div class="hint">${c.in != null ? `${fmt(c.in)}–${fmt(c.out)}s` : 'photo'} · ${fmt(clipDur(c))}s · ${c.fit === 'blur_pad' ? 'blurred' : 'crop'}${(c.speed && c.speed !== 1) ? ` · ${fmt(c.speed)}× ${c.speed > 1 ? 'timelapse' : 'slow-mo'}` : ''}</div>
       <div class="hint">L ${fmt(c.brightness)} · C ${fmt(c.contrast)} · S ${fmt(c.saturation)} · K ${fmt(c.warmth)}</div>
       ${m.has_audio ? `<div class="hint">🔊 sound ${(c.volume ?? 1) > 0 ? fmt((c.volume ?? 1) * 100) + '%' : 'off'}</div>` : ''}
       ${i > 0 ? `<div class="trb">${c.transition_in ? `↘ enters with ${c.transition_in.type} ${fmt(c.transition_in.duration)}s` : '| direct cut'}</div>` : ''}</div>
@@ -710,6 +710,7 @@ function clipRow(c, i) {
       ${i > 0 ? `<div class="field"><label>Transition</label><select data-f="tr_type"><option value="">direct cut</option>${TR_TYPES.map(t => `<option ${c.transition_in?.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <input type="number" data-f="tr_dur" step="0.05" min="0.15" max="1" value="${c.transition_in?.duration ?? 0.4}" ${c.transition_in ? '' : 'disabled'}><span class="hint">s</span></div>` : ''}
       <div class="field"><label>Framing</label><select data-f="fit"><option value="crop_center" ${c.fit === 'crop_center' ? 'selected' : ''}>center crop</option><option value="blur_pad" ${c.fit === 'blur_pad' ? 'selected' : ''}>blurred background</option></select></div>
+      ${c.in != null ? `<div class="field"><label title="Changes how fast the clip plays - the on-screen duration above updates with it. Original audio is time-stretched to match.">Speed</label><input type="range" data-f="speed" min="0.25" max="4" step="0.05" value="${c.speed ?? 1}"><span class="v">${fmt(c.speed ?? 1)}×</span></div>` : ''}
       <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
       <div class="adv">
         ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field"><label>${l}</label><input type="range" data-f="${k}" min="${mn}" max="${mx}" step="${st}" value="${c[k]}"><span class="v">${fmt(c[k])}</span></div>`).join('')}
@@ -743,6 +744,9 @@ function bindClips(area) {
     });
     row.querySelectorAll('[data-f]').forEach(inp => {
       if (inp.type === 'range') inp.addEventListener('pointerdown', () => snapshotEdl());
+      // speed changes the clip's on-screen duration, which the timeline's flex-basis and total
+      // depend on - unlike the other range sliders, it needs a full re-render once the drag ends.
+      if (inp.dataset.f === 'speed') inp.addEventListener('change', () => renderPlan());
       inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
         const f = inp.dataset.f, c = clips[i];
         if (inp.type !== 'range') snapshotEdl();

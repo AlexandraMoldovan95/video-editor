@@ -58,6 +58,7 @@ class Clip(BaseModel):
     saturation: float = Field(1.0, ge=0.0, le=3.0)
     warmth: float = Field(0.0, ge=-0.2, le=0.2)   # >0 warm (more red), <0 cool (more blue)
     volume: float = Field(1.0, ge=0.0, le=2.0)    # the clip's ORIGINAL sound (0 = mute); photos have no sound
+    speed: float = Field(1.0, ge=0.25, le=4.0)    # playback rate: 1.0 normal, <1 slow-mo, >1 timelapse. Video only.
     locked: bool = False   # locked by the user: the AI won't change it on regeneration
     transition_in: Transition | None = None   # the transition FROM the previous clip INTO this one
 
@@ -70,6 +71,12 @@ class Clip(BaseModel):
         if Path(v).name != v or v.startswith("."):
             raise ValueError(f"source must be a filename only: {v!r}")
         return v
+
+    @model_validator(mode="after")
+    def _speed_needs_video(self):
+        if self.in_ is None and self.speed != 1.0:
+            raise ValueError("speed only applies to video clips, not photos")
+        return self
 
 
 class EDL(BaseModel):
@@ -104,7 +111,7 @@ def validate_edl(raw: dict, media: dict[str, MediaInfo]) -> EDL:
 
 
 def total_duration(edl: EDL) -> float:
-    return sum((c.out - c.in_) if c.in_ is not None else c.duration for c in edl.clips)
+    return sum(clip_duration(c) for c in edl.clips)
 
 
 def overlap_errors(edl: EDL) -> list[str]:
@@ -123,7 +130,12 @@ def overlap_errors(edl: EDL) -> list[str]:
 
 
 def clip_duration(c: Clip) -> float:
-    return (c.out - c.in_) if c.in_ is not None else (c.duration or 2.5)
+    """The ON-SCREEN duration (what the timeline/total_duration/transition math uses) - for a
+    video clip this already accounts for speed; `c.out - c.in_` alone is the RAW source range
+    (used by overlap_errors, unaffected by speed)."""
+    if c.in_ is not None:
+        return (c.out - c.in_) / c.speed
+    return c.duration or 2.5
 
 
 def transition_errors(edl: EDL) -> list[str]:

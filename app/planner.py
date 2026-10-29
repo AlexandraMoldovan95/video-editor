@@ -13,8 +13,8 @@ import tempfile
 from pathlib import Path
 
 from . import hints as hints_mod
-from .edl import (EDL, Clip, TextItem, clamp_transitions, TRANSITIONS_DYNAMIC, TRANSITIONS_SUBTLE, overlap_errors,
-                  text_errors, total_duration, transition_errors, validate_edl)
+from .edl import (EDL, Clip, TextItem, clamp_transitions, clip_duration, TRANSITIONS_DYNAMIC, TRANSITIONS_SUBTLE,
+                  overlap_errors, text_errors, total_duration, transition_errors, validate_edl)
 from .frames import extract_frames, measure_rhythm
 from .hints import FileHint
 from . import subtitles as subs_mod
@@ -103,7 +103,9 @@ def _img_block(path: Path) -> dict:
 
 
 def _clip_dur(c: Clip) -> float:
-    return (c.out - c.in_) if c.in_ is not None else (c.duration or 2.5)
+    # on-screen duration, not raw source length - a locked slow-mo'd clip takes longer on screen
+    # than its in/out span, and the AI's remaining time budget needs to account for that.
+    return clip_duration(c)
 
 
 def build_request(media: dict[str, MediaInfo], preset_name: str, overrides: dict,

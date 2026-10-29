@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .edl import EDL, Clip, overlap_errors
+from .edl import EDL, Clip, clip_duration, overlap_errors
 
 AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
 SR = 22050
@@ -142,7 +142,8 @@ def snap_to_beats(edl: EDL, media: dict, grid: np.ndarray) -> EDL:
     """
     t = 0.0
     for i, c in enumerate(edl.clips):
-        cur = (c.out - c.in_) if c.in_ is not None else c.duration
+        # on-screen duration: a locked clip's own speed must not throw off where later clips land
+        cur = clip_duration(c)
         if c.locked or len(grid) == 0:
             t += cur
             continue
@@ -165,7 +166,7 @@ def snap_to_beats(edl: EDL, media: dict, grid: np.ndarray) -> EDL:
             if not overlap_errors(edl):
                 break
             c.in_, c.out, c.duration = old
-        t += (c.out - c.in_) if c.in_ is not None else c.duration
+        t += clip_duration(c)
     return edl
 
 

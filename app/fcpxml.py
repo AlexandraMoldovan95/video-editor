@@ -7,6 +7,9 @@ Exports an EDITABLE timeline that uses the ORIGINAL files (not the rendered MP4)
   OK texts (Basic Title, on video track 2)
   NOT TRANSFERRED: color grading (eq) - redo it in DaVinci's Color page
   NOT TRANSFERRED: the photos' slow zoom, the blurred background, text styling, ducking
+  NOT TRANSFERRED: clip speed (slow-mo/timelapse) - a sped-up/slowed-down clip is laid out at its
+    OWN ORIGINAL length and speed instead (no FCPXML timeMap), so the cut points stay honest;
+    redo the retime by hand in DaVinci/FCP if you want to keep the effect
 
 FCPXML rules worth knowing:
   - times are rational fractions ("90/30s"); the sequence is 30 fps -> everything in 1/30s frames
@@ -50,6 +53,16 @@ def t_src(sec: float, fps: float | None) -> str:
 
 def db(volume: float) -> str:
     return "-96dB" if volume <= 0.001 else f"{20 * math.log10(volume):.1f}dB"
+
+
+def export_duration(c, m: MediaInfo) -> float:
+    """The duration this clip occupies in the EXPORTED sequence. A speed-adjusted video clip has
+    no FCPXML retime here (see the module docstring), so it's laid out at its own original,
+    untouched length instead of the (speed-adjusted) on-screen length clip_duration() would give -
+    otherwise the asset-clip's duration would silently read the wrong amount of source footage."""
+    if m.kind == "video" and c.speed != 1.0:
+        return c.out - c.in_
+    return clip_duration(c)
 
 
 def build(edl: EDL, media: dict[str, MediaInfo], name: str = "Video Editor",
@@ -97,7 +110,7 @@ def build(edl: EDL, media: dict[str, MediaInfo], name: str = "Video Editor",
         ET.SubElement(res, "effect", id="etitle", name="Basic Title", uid=TITLE_UID)
 
     # ---- the sequence ----
-    total = sum(frames(clip_duration(c)) for c in edl.clips)
+    total = sum(frames(export_duration(c, media[c.source])) for c in edl.clips)
     lib = ET.SubElement(root, "library")
     ev = ET.SubElement(lib, "event", name=name)
     proj = ET.SubElement(ev, "project", name=name)
@@ -109,7 +122,7 @@ def build(edl: EDL, media: dict[str, MediaInfo], name: str = "Video Editor",
     pos = 0
     for i, c in enumerate(edl.clips):
         m = media[c.source]
-        nf = frames(clip_duration(c))
+        nf = frames(export_duration(c, m))
         if i > 0 and c.transition_in:
             d = frames(c.transition_in.duration)
             tr = ET.SubElement(spine, "transition", name="Cross Dissolve",

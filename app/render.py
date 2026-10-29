@@ -73,12 +73,20 @@ def build_segment_cmd(c: Clip, info: MediaInfo, w: int, h: int, fps: int,
            "-video_track_timescale", "15360", str(dst)]
 
     if info.kind == "video":
-        need = clip_duration(c) + tail_s
-        has_room = c.in_ + need <= info.duration - 0.05
+        # tail_s/clip_duration are OUTPUT (on-screen, post-speed) seconds; converting to RAW source
+        # seconds to read is what speed actually means: speed=2x timelapse needs HALF the raw footage
+        # for the same on-screen time, speed=0.5x slow-mo needs DOUBLE.
+        raw_main = c.out - c.in_
+        raw_tail = tail_s * c.speed
+        raw_need = raw_main + raw_tail
+        has_room = c.in_ + raw_need <= info.duration - 0.05
         pad = "" if has_room or not tail_frames else f",tpad=stop_mode=clone:stop_duration={tail_s + 0.2:.3f}"
+        speed_f = "" if c.speed == 1.0 else f"setpts=PTS/{c.speed:.4f},"
+        # setpts must run BEFORE the fps filter: fps resamples to a frame count based on the
+        # CURRENT duration, so the speed change has to already be applied for it to land right.
         graph = (fit_filter(c.fit, w, h, "0:v", "f") +
-                 f";[f]fps={fps},{color_filter(c)},setsar=1,format=yuv420p{pad}[v]")
-        take = need + 0.2 if has_room else clip_duration(c) + 0.1
+                 f";[f]{speed_f}fps={fps},{color_filter(c)},setsar=1,format=yuv420p{pad}[v]")
+        take = raw_need + 0.2 if has_room else raw_main + 0.1
         return ["ffmpeg", "-y", "-v", "error", "-ss", f"{c.in_:.3f}", "-t", f"{take:.3f}",
                 "-i", str(info.path), "-filter_complex", graph] + out, frames
 
@@ -238,12 +246,26 @@ def _render_in(edl, media, dst, work, w, h, fps, crf, subtitles=()):
 AR = 48000
 
 
+def atempo_chain(speed: float) -> str:
+    """ffmpeg's atempo filter only accepts 0.5-2.0 per instance; chain instances to cover the
+    clip speed range [0.25, 4.0] (e.g. 4.0 -> atempo=2.0,atempo=2.0)."""
+    factors, s = [], speed
+    while s < 0.5:
+        factors.append(0.5); s /= 0.5
+    while s > 2.0:
+        factors.append(2.0); s /= 2.0
+    factors.append(round(s, 6))
+    return ",".join(f"atempo={f}" for f in factors)
+
+
 def build_original_audio(edl: EDL, media: dict, work: Path, main_frames: list[int], fps: int) -> Path | None:
     """The clips' ORIGINAL sound track, sample-synced to the video.
 
     Each chunk is exactly main_frames/fps seconds long (48000/30 = 1600 samples per frame, exact).
     Clips with no sound, photos, and clips with volume=0 become silence. A 30ms fade at both ends
-    removes the pops at cuts. Returns None if there's no sound to use at all.
+    removes the pops at cuts. A sped-up/slowed-down clip's audio is time-stretched (atempo) to the
+    same factor, so it stays in sync with the picture - no raw pitch-shifted sound. Returns None if
+    there's no sound to use at all.
     """
     use = [media[c.source].kind == "video" and media[c.source].has_audio and c.volume > 0 for c in edl.clips]
     if not any(use):
@@ -253,9 +275,11 @@ def build_original_audio(edl: EDL, media: dict, work: Path, main_frames: list[in
         dur = main_frames[i] / fps
         name = f"a_{i:03d}.wav"
         if ok:
-            af = (f"aresample={AR},aformat=channel_layouts=stereo,volume={c.volume:.2f},"
+            raw_dur = dur * c.speed   # RAW source seconds needed before the tempo change gets us back to `dur`
+            tempo = f"{atempo_chain(c.speed)}," if c.speed != 1.0 else ""
+            af = (f"aresample={AR},aformat=channel_layouts=stereo,{tempo}volume={c.volume:.2f},"
                   f"afade=t=in:d=0.03,afade=t=out:st={max(0, dur - 0.03):.3f}:d=0.03,apad,atrim=0:{dur:.5f}")
-            cmd = ["ffmpeg", "-y", "-v", "error", "-ss", f"{c.in_:.3f}", "-t", f"{dur + 0.1:.3f}",
+            cmd = ["ffmpeg", "-y", "-v", "error", "-ss", f"{c.in_:.3f}", "-t", f"{raw_dur + 0.1:.3f}",
                    "-i", str(media[c.source].path), "-vn", "-af", af]
         else:
             cmd = ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"anullsrc=r={AR}:cl=stereo",
