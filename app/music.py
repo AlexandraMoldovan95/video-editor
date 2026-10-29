@@ -120,6 +120,31 @@ def analyze(path: Path) -> MusicInfo:
                      beats=[round(float(b), 3) for b in beats], energy=[round(float(e), 2) for e in energy])
 
 
+# ---------------- per-file waveform (timeline display) ----------------
+WAVE_BUCKET_S = 0.15   # fine enough to see shape on a sub-second cut, coarse enough to stay a small JSON
+
+
+def waveform(path: Path, bucket_s: float = WAVE_BUCKET_S) -> dict:
+    """A per-file RMS amplitude envelope, for drawing behind a clip's timeline segment.
+
+    One value (0..1, normalized to THIS file's own peak) per `bucket_s` seconds, covering the
+    WHOLE file - a clip only using part of it slices the bit it needs out of this on the frontend,
+    so trimming in/out never needs a re-request. Same `decode()`/RMS approach as the music energy
+    curve above, just at a finer, fixed time step instead of one value per second.
+    """
+    y = decode(path)
+    duration = len(y) / SR
+    if duration <= 0:
+        return {"duration": 0.0, "bucket_s": bucket_s, "values": []}
+    n = max(1, round(duration / bucket_s))
+    size = max(1, len(y) // n)
+    vals = np.array([np.sqrt(np.mean(y[i * size:(i + 1) * size].astype(np.float64) ** 2))
+                      for i in range(n)])
+    peak = vals.max()
+    vals = vals / peak if peak > 1e-6 else vals
+    return {"duration": round(duration, 3), "bucket_s": bucket_s, "values": [round(float(v), 3) for v in vals]}
+
+
 # ---------------- beat alignment ----------------
 def beat_grid(info: MusicInfo, start: float) -> np.ndarray:
     """The beats relative to the track's start point in the video."""

@@ -60,7 +60,9 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
 .tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:pointer;min-width:6px;background-size:cover;background-position:center;position:relative}
 .tl div.sel{outline:2px solid var(--acc);outline-offset:-2px}
-.tl div span{background:#000a;padding:0 3px;border-radius:3px;pointer-events:none}
+.tl div span{background:#000a;padding:0 3px;border-radius:3px;pointer-events:none;position:relative;z-index:1}
+.tl div .wave{position:absolute;inset:0;display:flex;align-items:flex-end;gap:0;opacity:.55;pointer-events:none;z-index:0}
+.tl div .wave i{flex:1;background:#fff;min-height:2px;min-width:1px}
 .tl div .trim{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2;touch-action:none}
 .tl div .trim.l{left:-1px}
 .tl div .trim.r{right:-1px}
@@ -299,7 +301,7 @@ async function loadProject(id) {
   P = await api(`/api/projects/${id}`);
   localStorageSet('proj', id);
   $('#projSel').value = id;
-  selFile = null; selClip = null; clearHistory();
+  selFile = null; selClip = null; clearHistory(); WAVEFORMS = {};
   renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderPlan(); renderDemoBtns();
   $('#player').removeAttribute('src'); $('#dl').hidden = true;
 }
@@ -600,11 +602,36 @@ function updatePlanBtn() {
   $('#planHint').textContent = P.edl ? 'Lock 🔒 the good cuts — the AI only redoes the rest.' : '';
 }
 const clipDur = c => c.in != null ? (c.out - c.in) / (c.speed || 1) : (c.duration || 2.5);
+// ---------------- per-clip waveform ----------------
+// One fetch per unique source file (not per clip/project id collision - see loadProject's reset),
+// cached client-side; each clip slices the bit of its source's envelope that its own in/out covers.
+let WAVEFORMS = {};
+async function ensureWaveforms() {
+  if (!P.edl) return;
+  const need = [...new Set(P.edl.clips.filter(c => c.in != null).map(c => c.source))]
+    .filter(src => { const m = mediaOf(src); return m && m.has_audio && !(src in WAVEFORMS) });
+  if (!need.length) return;
+  need.forEach(src => WAVEFORMS[src] = null);   // mark in-flight so a second renderPlan() doesn't re-fetch
+  await Promise.all(need.map(async src => {
+    try { WAVEFORMS[src] = await api(`/api/projects/${P.id}/waveform/${encodeURIComponent(src)}`) }
+    catch { WAVEFORMS[src] = false }            // false = tried, failed - draw nothing, don't retry forever
+  }));
+  if (P.edl) renderPlan();   // the project could have changed while the fetch was in flight
+}
+function waveBars(c) {
+  const wf = c.in != null ? WAVEFORMS[c.source] : null;
+  if (!wf || !wf.values || !wf.values.length) return '';
+  const bs = wf.bucket_s;
+  const slice = wf.values.slice(Math.max(0, Math.floor(c.in / bs)), Math.min(wf.values.length, Math.ceil(c.out / bs)));
+  if (!slice.length) return '';
+  return `<div class="wave">${slice.map(v => `<i style="height:${Math.round(v * 100)}%"></i>`).join('')}</div>`;
+}
 function renderPlan() {
   const area = $('#planArea');
   updatePlanBtn();
   $('#usage').textContent = P.usage ? `last plan: ${P.usage.input_tokens} tok in / ${P.usage.output_tokens} out` : '';
   if (!P.edl) { area.innerHTML = `<div class="empty">Upload your material, choose a preset, and click "Generate plan"${DEMOS.length ? ' — or try one of the demo buttons above' : ''}.</div>`; return }
+  ensureWaveforms();
   const clips = P.edl.clips, total = clips.reduce((s, c) => s + clipDur(c), 0);
   const target = +$('#f_target_duration').value;
   const off = Math.abs(total - target) > target * 0.1;
@@ -618,7 +645,7 @@ function renderPlan() {
       <button class="small" id="splitBtn" title="Split the video clip under the preview's current playback position (S)">✂ Split</button>
       <span class="hint" id="edlMsg"></span></div>
     <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · S splits the clip at the preview's position · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it.</div>
-    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
+    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${waveBars(c)}${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
     ${textTrack(total)}
     ${clips.map((c, i) => clipRow(c, i)).join('')}
     ${Object.keys(P.transcripts || {}).length ? `<label class="row hint" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="subChk" ${P.subtitles ? 'checked' : ''}>

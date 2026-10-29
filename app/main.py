@@ -24,7 +24,7 @@ from .hints import FileHint
 from . import fcpxml
 from . import subtitles as subs_mod
 from . import transcribe as tr_mod
-from .music import AUDIO_EXT, MusicInfo, analyze, beat_grid, snap_to_beats
+from .music import AUDIO_EXT, MusicInfo, analyze, beat_grid, snap_to_beats, waveform as compute_waveform
 from .presets import COLOR_BASE, PACE_RANGE, PRESETS
 from .probe import IMAGE_EXT
 from .render import VIDEO_EXT, render, scan_media
@@ -326,6 +326,7 @@ def delete_media(pid: str, name: str):
     name = safe_name(name)
     (d / "input" / name).unlink(missing_ok=True)
     (d / "thumbs" / (Path(name).stem + ".jpg")).unlink(missing_ok=True)
+    (d / "waveforms" / (Path(name).stem + ".json")).unlink(missing_ok=True)
     st = load_state(d)
     st["hints"].pop(name, None)
     save_state(d, st)
@@ -338,6 +339,27 @@ def get_thumb(pid: str, name: str):
     if not f.exists():
         raise HTTPException(404)
     return FileResponse(f)
+
+
+@app.get("/api/projects/{pid}/waveform/{name}")
+def get_waveform(pid: str, name: str):
+    """Cached per-file RMS envelope for the timeline. Computed lazily on first request (not at
+    upload) and cached to disk after - works retroactively for files uploaded before this existed."""
+    d = pdir(pid)
+    name = safe_name(name)
+    f = d / "waveforms" / (Path(name).stem + ".json")
+    if not f.exists():
+        media = scan_media(d / "input")
+        info = media.get(name)
+        if not info or info.kind != "video" or not info.has_audio:
+            raise HTTPException(404, "no audio to show a waveform for")
+        f.parent.mkdir(exist_ok=True)
+        try:
+            wf = compute_waveform(info.path)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(422, f"could not analyze audio: {e}")
+        f.write_text(json.dumps(wf), encoding="utf-8")
+    return FileResponse(f, media_type="application/json")
 
 
 @app.get("/api/projects/{pid}/media/{name}")
