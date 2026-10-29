@@ -60,6 +60,10 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
 .tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:pointer;min-width:6px;background-size:cover;background-position:center;position:relative}
 .tl div.sel{outline:2px solid var(--acc);outline-offset:-2px}
+.tl div.multisel{outline:2px dashed var(--ok);outline-offset:-2px}
+.tl div.multisel.sel{outline:2px solid var(--acc)}
+.clip.multisel{border-color:var(--ok)}
+.bulkbar{background:var(--panel2);border-radius:7px;padding:6px 8px;margin:4px 0}
 .tl div span{background:#000a;padding:0 3px;border-radius:3px;pointer-events:none;position:relative;z-index:1}
 .tl div .wave{position:absolute;inset:0;display:flex;align-items:flex-end;gap:0;opacity:.55;pointer-events:none;z-index:0}
 .tl div .wave i{flex:1;background:#fff;min-height:2px;min-width:1px}
@@ -252,6 +256,7 @@ function bindAdvToggle(container) {
 
 let CFG, DEMOS = [], P = null, selFile = null, selClip = null;
 let EDL_HISTORY = [], EDL_FUTURE = [];   // undo/redo over P.edl (manual edits only — see snapshotEdl)
+let MULTI_SEL = new Set(), MULTI_ANCHOR = null;   // bulk clip selection on the timeline (shift/ctrl-click)
 
 // ---------------- undo / redo ----------------
 function snapshotEdl() {
@@ -261,7 +266,10 @@ function snapshotEdl() {
   if (EDL_HISTORY.length > 200) EDL_HISTORY.shift();
   EDL_FUTURE = [];
 }
-function clearHistory() { EDL_HISTORY = []; EDL_FUTURE = [] }
+// a fresh plan (new project, regenerate, demo load) invalidates both undo history and any
+// multi-selection (old indices into clips that may no longer exist in the same shape)
+function clearHistory() { EDL_HISTORY = []; EDL_FUTURE = []; clearMultiSel() }
+function clearMultiSel() { MULTI_SEL.clear(); MULTI_ANCHOR = null }
 function undo() {
   if (!EDL_HISTORY.length) return;
   EDL_FUTURE.push(JSON.stringify(P.edl));
@@ -644,17 +652,35 @@ function renderPlan() {
       <button class="small" id="redoBtn" title="Redo (Ctrl+Y)" ${EDL_FUTURE.length ? '' : 'disabled'}>↷ Redo</button>
       <button class="small" id="splitBtn" title="Split the video clip under the preview's current playback position (S)">✂ Split</button>
       <span class="hint" id="edlMsg"></span></div>
-    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · S splits the clip at the preview's position · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it.</div>
-    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${waveBars(c)}${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
+    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · S splits the clip at the preview's position · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it · shift/ctrl-click clips on the timeline to multi-select.</div>
+    ${MULTI_SEL.size ? bulkBar() : ''}
+    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${MULTI_SEL.has(i) ? 'multisel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${waveBars(c)}${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
     ${textTrack(total)}
     ${clips.map((c, i) => clipRow(c, i)).join('')}
     ${Object.keys(P.transcripts || {}).length ? `<label class="row hint" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="subChk" ${P.subtitles ? 'checked' : ''}>
       Automatic subtitles from the transcript <span>(${(P.subtitles_preview || []).length} on the current timeline · recalculated on every render)</span></label>` : ''}
     <div class="row" style="margin:16px 0 8px"><b>On-screen text</b><span class="hint">times are on the final video · editing locks the text 🔒</span><div style="flex:1"></div><button class="small" id="addText">+ Add text</button></div>
     ${(P.edl.texts || []).length ? P.edl.texts.map((t, k) => textRow(t, k, total)).join('') : '<div class="hint">No text yet. Choose a text style in the preset, or add one manually.</div>'}`;
-  area.querySelectorAll('.tl div').forEach(d => d.onclick = () => { selClip = selClip === +d.dataset.i ? null : +d.dataset.i; renderPlan(); area.querySelector(`.clip[data-i="${d.dataset.i}"]`)?.scrollIntoView({block: 'nearest'}) });
+  area.querySelectorAll('.tl div').forEach(d => d.onclick = e => {
+    const i = +d.dataset.i;
+    if (e.shiftKey && MULTI_ANCHOR != null) {
+      const [lo, hi] = [Math.min(MULTI_ANCHOR, i), Math.max(MULTI_ANCHOR, i)];
+      MULTI_SEL.clear(); for (let k = lo; k <= hi; k++) MULTI_SEL.add(k);
+      selClip = null;
+    } else if (e.ctrlKey || e.metaKey) {
+      if (MULTI_SEL.has(i)) MULTI_SEL.delete(i); else MULTI_SEL.add(i);
+      MULTI_ANCHOR = i; selClip = null;
+    } else {
+      clearMultiSel();
+      MULTI_ANCHOR = i;
+      selClip = selClip === i ? null : i;
+    }
+    renderPlan();
+    area.querySelector(`.clip[data-i="${i}"]`)?.scrollIntoView({block: 'nearest'});
+  });
   bindClips(area);
   bindTexts(area, total);
+  bindBulkBar(area);
   bindTimelineDrag(area);
   $('#undoBtn').onclick = undo;
   $('#redoBtn').onclick = redo;
@@ -724,7 +750,7 @@ function clipRow(c, i) {
     ? `<div class="field"><label>Start / end</label><input type="number" data-f="in" step="0.1" min="0" max="${m.duration}" value="${c.in}"><input type="number" data-f="out" step="0.1" min="0" max="${m.duration}" value="${c.out}"><span class="hint">/ ${fmt(m.duration || 0)}s</span></div>`
     : `<div class="field"><label>Duration</label><input type="number" data-f="duration" step="0.1" min="2" max="4" value="${c.duration}"></div>
        <div class="field"><label>Motion</label><select data-f="motion">${['zoom_in', 'zoom_out', 'static'].map(v => `<option ${c.motion === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
-  return `<div class="clip ${open ? 'sel' : ''} ${c.locked ? 'locked' : ''}" data-i="${i}">
+  return `<div class="clip ${open ? 'sel' : ''} ${MULTI_SEL.has(i) ? 'multisel' : ''} ${c.locked ? 'locked' : ''}" data-i="${i}">
     <div class="ix">${i + 1}</div>
     <img src="${thumb(c.source)}" alt="">
     <div><div class="src" title="${esc(c.source)}">${esc(c.source)}</div>
@@ -761,6 +787,43 @@ const saveEdl = debounce(async () => {
   }
   catch (e) { $('#edlMsg').textContent = e.message; $('#edlMsg').style.color = 'var(--err)' }
 }, 400);
+// ---------------- bulk clip selection ----------------
+function bulkBar() {
+  const idx = Math.min(...MULTI_SEL), first = P.edl.clips[idx] || {};
+  return `<div class="row bulkbar">
+    <b>${MULTI_SEL.size} clip${MULTI_SEL.size > 1 ? 's' : ''} selected</b>
+    <button class="small" id="bulkLock">🔒 Lock</button>
+    <button class="small" id="bulkUnlock">Unlock</button>
+    <button class="small" id="bulkDel" style="color:var(--err)">✕ Delete</button>
+    <button class="small ghost" id="bulkClear">Clear</button>
+  </div>
+  <div class="row bulkbar" style="margin-top:-8px">
+    <span class="hint">apply to all selected:</span>
+    ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field" style="min-width:84px"><label>${l}</label><input type="range" data-bulk="${k}" min="${mn}" max="${mx}" step="${st}" value="${first[k]}"></div>`).join('')}
+  </div>`;
+}
+function bindBulkBar(area) {
+  const lock = $('#bulkLock'), unlock = $('#bulkUnlock'), del = $('#bulkDel'), clear = $('#bulkClear');
+  if (!lock) return;   // bar isn't rendered when nothing is selected
+  lock.onclick = () => { snapshotEdl(); MULTI_SEL.forEach(i => { if (P.edl.clips[i]) P.edl.clips[i].locked = true }); saveEdl(); renderPlan() };
+  unlock.onclick = () => { snapshotEdl(); MULTI_SEL.forEach(i => { if (P.edl.clips[i]) P.edl.clips[i].locked = false }); saveEdl(); renderPlan() };
+  del.onclick = () => {
+    snapshotEdl();
+    P.edl.clips = P.edl.clips.filter((c, i) => !MULTI_SEL.has(i));
+    clearMultiSel(); selClip = null;
+    saveEdl(); renderPlan();
+  };
+  clear.onclick = () => { clearMultiSel(); renderPlan() };
+  area.querySelectorAll('[data-bulk]').forEach(inp => {
+    inp.addEventListener('pointerdown', () => snapshotEdl());
+    inp.addEventListener('input', () => {
+      const f = inp.dataset.bulk, v = +inp.value;
+      MULTI_SEL.forEach(i => { const c = P.edl.clips[i]; if (c) { c[f] = v; c.locked = true } });
+      saveEdl();
+    });
+    inp.addEventListener('change', () => renderPlan());   // re-render once, after the drag ends
+  });
+}
 function bindClips(area) {
   area.querySelectorAll('.clip').forEach(row => {
     const i = +row.dataset.i, clips = P.edl.clips;
@@ -768,6 +831,7 @@ function bindClips(area) {
     row.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       const a = b.dataset.a;
       if (a !== 'edit') snapshotEdl();
+      if (a === 'del' || a === 'up' || a === 'down') clearMultiSel();   // these shift indices - a stale selection would point at the wrong clips
       if (a === 'lock') clips[i].locked = !clips[i].locked;
       if (a === 'edit') selClip = selClip === i ? null : i;
       if (a === 'del') { clips.splice(i, 1); selClip = null }
@@ -847,6 +911,7 @@ function trySplit() {
   const dur = c.out - c.in;
   if (hit.offset < 0.5 || dur - hit.offset < 0.5) return showEdlMsg('Too close to the edge of this clip to split (min 0.5s on each side).', true);
   snapshotEdl();
+  clearMultiSel();   // inserting a clip shifts every later index
   const splitPoint = +(c.in + hit.offset).toFixed(2);
   const first = {...c, out: splitPoint, locked: true};
   const second = {...c, in: splitPoint, transition_in: null, locked: true};
@@ -972,8 +1037,12 @@ document.addEventListener('keydown', e => {
   else if (k === 'i' || k === 'I') { $('#setIn')?.click() }
   else if (k === 'o' || k === 'O') { $('#setOut')?.click() }
   else if (k === 's' || k === 'S') { $('#splitBtn')?.click() }
+  else if (k === 'Escape' && MULTI_SEL.size) { clearMultiSel(); renderPlan() }
   else if (k === 'Delete' || k === 'Backspace') {
-    if (P && P.edl && selClip != null && P.edl.clips[selClip]) {
+    if (P && P.edl && MULTI_SEL.size) {
+      e.preventDefault();
+      $('#bulkDel')?.click();
+    } else if (P && P.edl && selClip != null && P.edl.clips[selClip]) {
       e.preventDefault();
       snapshotEdl();
       P.edl.clips.splice(selClip, 1); selClip = null; saveEdl(); renderPlan();
