@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .demo_presets import DEMO_PRESETS
 from .edl import EDL, clamp_transitions, text_errors, total_duration, validate_edl
 from .frames import thumbnail
 from .hints import FileHint
@@ -59,7 +60,7 @@ def load_state(d: Path) -> dict:
     f = d / "state.json"
     return json.loads(f.read_text("utf-8")) if f.exists() else {
         "preset": "neutral", "overrides": {}, "hints": {}, "edl": None, "reasoning": "", "usage": None,
-        "music": None}
+        "music": None, "is_demo": None}
 
 
 def save_state(d: Path, st: dict) -> None:
@@ -120,6 +121,40 @@ def run_job(fn, *args) -> str:
 def config():
     return {"presets": {k: v.model_dump() for k, v in PRESETS.items()},
             "pace_range": PACE_RANGE, "color_base": COLOR_BASE}
+
+
+# ---------- demo (pre-built example plans, no AI call) ----------
+@app.get("/api/demo")
+def list_demo_presets():
+    return [{"key": k, "label": v["label"], "description": v["description"], "sources": v["sources"]}
+            for k, v in DEMO_PRESETS.items()]
+
+
+@app.post("/api/projects/{pid}/demo/{key}")
+def apply_demo_preset(pid: str, key: str):
+    d = pdir(pid)
+    if pid in PLANNING:
+        raise HTTPException(409, "the AI is generating the plan - wait for it to finish")
+    preset = DEMO_PRESETS.get(key)
+    if not preset:
+        raise HTTPException(404, "unknown demo preset")
+    media = scan_media(d / "input")
+    missing = [s for s in preset["sources"] if s not in media]
+    if missing:
+        raise HTTPException(400, f"this demo needs these sample files uploaded first: {', '.join(missing)}")
+    try:
+        edl = validate_edl(preset["edl"], media)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(422, str(e))
+    st = load_state(d)
+    st["edl"] = edl.model_dump(by_alias=True, exclude_none=True)
+    st["reasoning"] = preset.get("reasoning", "")
+    st["usage"] = None
+    st["is_demo"] = key
+    if preset.get("overrides"):
+        st["overrides"] = {**st.get("overrides", {}), **preset["overrides"]}
+    save_state(d, st)
+    return {"ok": True, "total": total_duration(edl), "overrides": st["overrides"]}
 
 
 # ---------- projects ----------
@@ -367,6 +402,7 @@ def put_edl(pid: str, raw: dict):
         raise HTTPException(422, str(e))
     st = load_state(d)
     st["edl"] = edl.model_dump(by_alias=True, exclude_none=True)
+    st["is_demo"] = None
     save_state(d, st)
     return {"ok": True, "total": total_duration(edl)}
 
@@ -394,6 +430,7 @@ def _plan(d: Path) -> dict:
     r = plan(media, st["preset"], st["overrides"], example_path(d), hints, current, music_ctx(d, st), trs)
     st["edl"] = r["edl"].model_dump(by_alias=True, exclude_none=True)
     st["reasoning"], st["usage"] = r["reasoning"], r["usage"]
+    st["is_demo"] = None
     save_state(d, st)
     return {"reasoning": r["reasoning"], "usage": r["usage"], "total": total_duration(r["edl"])}
 

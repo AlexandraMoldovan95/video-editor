@@ -154,7 +154,12 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
   <section class="col">
     <h2>2 · Edit plan</h2>
     <div class="sec">
-      <div class="panel" style="margin-top:0">
+      <div class="panel" id="demoPanel" style="margin-top:0" hidden>
+        <h3>Try a demo <span class="hint">(pre-built example — no AI call, loads instantly)</span></h3>
+        <div class="hint" style="margin-bottom:8px">Example plans for the sample clips they use, so you can see the app work without spending API credits.</div>
+        <div class="row" id="demoBtns"></div>
+      </div>
+      <div class="panel">
         <div class="row" style="margin-bottom:6px">
           <label class="hint">Preset</label>
           <select id="preset"></select>
@@ -233,9 +238,9 @@ function bindAdvToggle(container) {
   };
 }
 
-let CFG, P = null, selFile = null, selClip = null;
+let CFG, DEMOS = [], P = null, selFile = null, selClip = null;
 const PRESET_FIELDS = ['target_duration', 'pace', 'color_look', 'vertical_fit', 'photo_motion', 'transition_style', 'text_style'];
-const TR_TYPES = ['fade', 'dissolve', 'fadeblack', 'fadewhite', 'wipeleft', 'slideleft', 'slideup', 'smoothleft', 'circleopen', 'zoomin'];
+const TR_TYPES = ['fade', 'dissolve', 'fadeblack', 'fadewhite', 'wipeleft', 'slideleft', 'slideup', 'smoothleft', 'circleopen', 'circleclose'];
 const COLOR_KEYS = [['brightness', 'Brightness', -0.3, 0.3, 0.01], ['contrast', 'Contrast', 0.5, 2, 0.01],
                     ['saturation', 'Saturation', 0, 3, 0.01], ['warmth', 'Warmth', -0.2, 0.2, 0.01]];
 const thumb = n => `/api/projects/${P.id}/thumb/${encodeURIComponent(n)}`;
@@ -245,6 +250,8 @@ const mediaOf = n => P.media.find(m => m.name === n);
 async function init() {
   CFG = await api('/api/config');
   $('#preset').innerHTML = Object.keys(CFG.presets).map(k => `<option>${k}</option>`).join('');
+  try { DEMOS = await api('/api/demo') } catch { DEMOS = [] }
+  $('#demoPanel').hidden = !DEMOS.length;
   let list = await api('/api/projects');
   if (!list.length) { await api('/api/projects', {method: 'POST'}); list = await api('/api/projects') }
   fillProjects(list);
@@ -260,7 +267,7 @@ async function loadProject(id) {
   localStorageSet('proj', id);
   $('#projSel').value = id;
   selFile = null; selClip = null;
-  renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderPlan();
+  renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderPlan(); renderDemoBtns();
   $('#player').removeAttribute('src'); $('#dl').hidden = true;
 }
 async function refresh() { P = await api(`/api/projects/${P.id}`); }
@@ -281,7 +288,7 @@ async function upload(files) {
   try { await api(`/api/projects/${P.id}/upload`, {method: 'POST', body: fd}) }
   catch (e) { alertStatus('#planStatus', e.message, true) }
   drop.innerHTML = 'Drag videos and photos here<br><small>or click to choose</small>';
-  await refresh(); renderGrid(); renderTranscripts(); fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
+  await refresh(); renderGrid(); renderTranscripts(); renderDemoBtns(); fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
 }
 $('#exBtn').onclick = () => $('#exIn').click();
 $('#exIn').onchange = async e => {
@@ -387,7 +394,7 @@ function renderHint() {
     $('#clrSeg').onclick = () => { $('#h_in').value = ''; $('#h_out').value = ''; save() };
   }
   $('#h_reset').onclick = async () => { await api(`/api/projects/${P.id}/hints/${encodeURIComponent(selFile)}`, jsonOpt('PUT', DEFAULT_HINT)); delete P.hints[selFile]; renderGrid(); renderHint() };
-  $('#h_del').onclick = async () => { await api(`/api/projects/${P.id}/media/${encodeURIComponent(selFile)}`, {method: 'DELETE'}); selFile = null; await refresh(); renderGrid(); renderHint() };
+  $('#h_del').onclick = async () => { await api(`/api/projects/${P.id}/media/${encodeURIComponent(selFile)}`, {method: 'DELETE'}); selFile = null; await refresh(); renderGrid(); renderHint(); renderDemoBtns() };
 }
 
 // ---------------- transcription (Whisper) ----------------
@@ -479,6 +486,31 @@ function renderMusic() {
   $('#muEnergy').onclick = e => { const s = e.target.dataset.s; if (s != null) { body.querySelector('[data-mk=start]').value = s; save() } };
 }
 
+// ---------------- demo (pre-built example plans, no AI call) ----------------
+function renderDemoBtns() {
+  const el = $('#demoBtns');
+  if (!el || !DEMOS.length) return;
+  const names = new Set(P.media.map(m => m.name));
+  el.innerHTML = DEMOS.map(d => {
+    const missing = d.sources.filter(s => !names.has(s));
+    const ok = missing.length === 0;
+    const title = ok ? d.description : `Needs these sample files uploaded first: ${missing.join(', ')}`;
+    return `<button class="small" data-demo="${esc(d.key)}" ${ok ? '' : 'disabled'} title="${esc(title)}">${esc(d.label)}</button>`;
+  }).join('');
+  el.querySelectorAll('[data-demo]').forEach(b => b.onclick = () => loadDemo(b.dataset.demo));
+}
+async function loadDemo(key) {
+  const el = $('#demoBtns');
+  el.querySelectorAll('button').forEach(b => b.disabled = true);
+  $('#planStatus').hidden = true;
+  try {
+    const r = await api(`/api/projects/${P.id}/demo/${key}`, {method: 'POST'});
+    P.overrides = r.overrides ?? P.overrides;
+    await refresh(); selClip = null; renderSettings(); renderPlan();
+  } catch (e) { alertStatus('#planStatus', e.message, true) }
+  renderDemoBtns();
+}
+
 // ---------------- preset + fields ----------------
 function renderSettings() {
   $('#preset').value = P.preset;
@@ -539,11 +571,13 @@ function renderPlan() {
   const area = $('#planArea');
   updatePlanBtn();
   $('#usage').textContent = P.usage ? `last plan: ${P.usage.input_tokens} tok in / ${P.usage.output_tokens} out` : '';
-  if (!P.edl) { area.innerHTML = '<div class="empty">Upload your material, choose a preset, and click "Generate plan".</div>'; return }
+  if (!P.edl) { area.innerHTML = `<div class="empty">Upload your material, choose a preset, and click "Generate plan"${DEMOS.length ? ' — or try one of the demo buttons above' : ''}.</div>`; return }
   const clips = P.edl.clips, total = clips.reduce((s, c) => s + clipDur(c), 0);
   const target = +$('#f_target_duration').value;
   const off = Math.abs(total - target) > target * 0.1;
+  const demoInfo = P.is_demo ? DEMOS.find(d => d.key === P.is_demo) : null;
   area.innerHTML = `
+    ${demoInfo ? `<div class="hint" style="margin-bottom:8px">\u{1F9EA} Pre-built example: <b style="color:var(--text)">${esc(demoInfo.label)}</b> — no AI call was used for this plan.</div>` : ''}
     ${P.reasoning ? `<div class="reason">${esc(P.reasoning)}</div>` : ''}
     <div class="row"><b>Timeline</b><span class="total ${off ? 'off' : ''}">${fmt(total)}s / target ${target}s</span><span class="hint" id="edlMsg"></span></div>
     <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}"><span>${c.locked ? '🔒' : i + 1}</span></div>`).join('')}</div>${beatTicks(total)}</div>
@@ -647,6 +681,7 @@ function clipRow(c, i) {
 const saveEdl = debounce(async () => {
   try {
     await api(`/api/projects/${P.id}/edl`, jsonOpt('PUT', P.edl));
+    P.is_demo = null;   // a manual edit means this is no longer the untouched demo/AI plan
     if (Object.keys(P.transcripts || {}).length) { const np = await api(`/api/projects/${P.id}`); P.subtitles_preview = np.subtitles_preview; const tr = document.querySelector('.trk'); if (tr) tr.outerHTML = textTrack(P.edl.clips.reduce((s, c) => s + clipDur(c), 0)) }
     $('#edlMsg').textContent = '✓ saved'; $('#edlMsg').style.color = 'var(--ok)';
   }

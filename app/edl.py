@@ -14,9 +14,13 @@ class Output(BaseModel):
 
 
 TransitionType = Literal["fade", "dissolve", "fadeblack", "fadewhite", "wipeleft", "slideleft",
-                         "slideup", "smoothleft", "circleopen", "zoomin"]
+                         "slideup", "smoothleft", "circleopen", "circleclose"]
 TRANSITIONS_SUBTLE = ["fade", "dissolve", "fadeblack"]
-TRANSITIONS_DYNAMIC = ["slideleft", "slideup", "wipeleft", "smoothleft", "circleopen", "zoomin", "fadewhite"]
+TRANSITIONS_DYNAMIC = ["slideleft", "slideup", "wipeleft", "smoothleft", "circleopen", "circleclose", "fadewhite"]
+# NOTE: "zoomin" is deliberately NOT offered here even though some newer ffmpeg builds support it as an
+# xfade transition name - it isn't in the xfade transition list on ffmpeg 4.4 (e.g. Ubuntu 22.04's
+# packaged build), so a plan that picks it fails at the final ffmpeg assembly step on an older install.
+# All ten names above were checked against `ffmpeg -h filter=xfade` and work on 4.4+.
 
 
 class Transition(BaseModel):

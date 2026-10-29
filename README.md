@@ -31,6 +31,7 @@ Editing a 30-second reel by hand — picking the best seconds out of raw clips, 
 - **Music-aware editing**: custom beat detection written in plain numpy (no librosa) finds the BPM and beat grid; cuts can snap to the beat, with ducking so the original clip audio stays audible under the music.
 - **Two export paths**: a finished MP4 (draft or 1080×1920 final), or an FCPXML timeline that reopens the *original* files in DaVinci Resolve/Final Cut for a full manual re-edit.
 - **Optional subtitles**: Whisper transcribes speech and subtitles are recalculated live from the current timeline, so they never go out of sync with your edits.
+- **Try a demo, no API key needed**: three pre-built example plans (`app/demo_presets.py`) load instantly over the same sample clips and show three very different edits — fast/contrasty, slow/warm, cinematic travel. Two are hand-built to match a preset's rules; the third replays a real saved Claude run. None of the three calls the API, so anyone can see the mechanism work without spending anything.
 
 ## Engineering in short
 
@@ -74,6 +75,8 @@ Optional, for automatic subtitles (Whisper):
 py -m pip install -r requirements-whisper.txt
 ```
 The model downloads on first use (~460 MB, `small`). A smaller model is available via `VEDIT_WHISPER_MODEL=base`, at some accuracy cost.
+
+**To try the 3 demo plans without an API key**, upload a project with these exact Pexels sample filenames (any free Pexels clips/photos renamed to match work — see `app/demo_presets.py` for the full list): `16928481_1080_1920_50fps.mp4`, `16581829_1440_2560_60fps.mp4`, `15940078_2160_3840_30fps.mp4`, `16615054_2160_3840_25fps.mp4`, `16931601_1080_1920_120fps.mp4`, `17198558_3840_2160_30fps.mp4`, `12772832_1080_1920_30fps.mp4`, plus 3 photos (`pexels-ayse-ela-dikye-49914919-16268987.jpg`, `pexels-hayriyenur-351892318-39457179.jpg`, `pexels-santesson89-37765467.jpg`). The demo buttons on a project missing any of those stay disabled with a tooltip naming what's missing.
 
 ## Known limitations (honest)
 
