@@ -16,7 +16,7 @@
 |---|---|
 | **What** | Local Python web app (FastAPI backend, single-file vanilla-JS frontend) · ffmpeg for rendering · Claude API for the editing decisions · Windows |
 | **My role** | Product idea, UX, the "AI decides, code executes" architecture, and all manual testing. The code was written in pair-programming with an AI assistant (Claude): see [How it was built](#how-it-was-built). |
-| **Quality** | Manually verified end to end: render pipeline (hand-written EDL → correct MP4), the AI planner with a real preset, and the FastAPI server + frontend (Playwright). No automated test suite yet. |
+| **Quality** | Manually verified end to end: render pipeline (hand-written EDL → correct MP4), the AI planner with a real preset, and the FastAPI server + frontend (Playwright). The manual editing tools were verified against synthetic ffmpeg test media and, for the full combined feature set, a real end-to-end render through the live FastAPI app against the project's own real sample files. No automated test suite yet. |
 | **Status** | Personal/portfolio project, all planned features implemented. Honest open items below — Whisper transcription and the DaVinci Resolve import still need to be tried on a normal Windows network/install. |
 
 ## Why it exists
@@ -32,6 +32,7 @@ Editing a 30-second reel by hand — picking the best seconds out of raw clips, 
 - **Two export paths**: a finished MP4 (draft or 1080×1920 final), or an FCPXML timeline that reopens the *original* files in DaVinci Resolve/Final Cut for a full manual re-edit.
 - **Optional subtitles**: Whisper transcribes speech and subtitles are recalculated live from the current timeline, so they never go out of sync with your edits.
 - **Try a demo, no API key needed**: three pre-built example plans (`app/demo_presets.py`) load instantly over the same sample clips and show three very different edits — fast/contrasty, slow/warm, cinematic travel. Two are hand-built to match a preset's rules; the third replays a real saved Claude run. None of the three calls the API, so anyone can see the mechanism work without spending anything.
+- **A full manual editing pass once the AI draft lands** — none of it calls the API, all of it is plain timeline editing: undo/redo and NLE-style keyboard shortcuts (Space/J/K/L/I/O/S/Del/Ctrl+Z); drag-trim a clip's in/out directly on the timeline bar; a split (razor) tool at the preview's playhead; per-clip speed (0.25×–4×, with matching audio time-stretch); manual reframe/pan on top of the auto-crop; a per-clip waveform drawn on the timeline from the source audio; shift/ctrl-click multi-select with bulk lock/delete/color-grade; and free-drag text placement instead of only top/center/bottom.
 
 ## Engineering in short
 
@@ -85,6 +86,8 @@ The model downloads on first use (~460 MB, `small`). A smaller model is availabl
 - **Whisper and the DaVinci import are still untested on a normal network/install.** Whisper's model download is blocked in the sandboxed environment this was developed in; the subtitle *logic* was verified with a simulated transcript, and the FCPXML timing was validated against OpenTimelineIO, but neither has been exercised for real yet.
 - **No YouTube support, on purpose** — downloading from it breaks YouTube's terms, and licensed music gets muted or claimed on most platforms anyway. For TikTok/Reels, export without music and add the same track from inside the app.
 - Uploaded files are copied into the project folder, so a project's disk footprint adds up.
+- **The FCPXML export doesn't carry over three of the manual tools**: a sped-up/slowed-down clip, a manually panned crop, and a freely-dragged text all land in DaVinci/Final Cut at their old, un-adjusted spot — redo those three by hand there if you want to keep the look. Everything else (cuts, color look's base values, transitions-as-dissolve, music) does transfer.
+- **A clip's waveform only shows up if the clip has its own audio.** Silent b-roll (most stock footage, including this project's own Pexels demo sample clips) has nothing to draw — that's expected, not a bug.
 
 ## API cost
 
