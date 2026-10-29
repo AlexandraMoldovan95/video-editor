@@ -59,6 +59,8 @@ class Clip(BaseModel):
     warmth: float = Field(0.0, ge=-0.2, le=0.2)   # >0 warm (more red), <0 cool (more blue)
     volume: float = Field(1.0, ge=0.0, le=2.0)    # the clip's ORIGINAL sound (0 = mute); photos have no sound
     speed: float = Field(1.0, ge=0.25, le=4.0)    # playback rate: 1.0 normal, <1 slow-mo, >1 timelapse. Video only.
+    pan_x: float = Field(0.0, ge=-1.0, le=1.0)    # manual reframe for fit=crop_center: -1 full left, 0 center, 1 full right
+    pan_y: float = Field(0.0, ge=-1.0, le=1.0)    # same, vertically: -1 full top, 1 full bottom
     locked: bool = False   # locked by the user: the AI won't change it on regeneration
     transition_in: Transition | None = None   # the transition FROM the previous clip INTO this one
 
@@ -76,6 +78,12 @@ class Clip(BaseModel):
     def _speed_needs_video(self):
         if self.in_ is None and self.speed != 1.0:
             raise ValueError("speed only applies to video clips, not photos")
+        return self
+
+    @model_validator(mode="after")
+    def _pan_needs_crop_center(self):
+        if self.fit != "crop_center" and (self.pan_x != 0.0 or self.pan_y != 0.0):
+            raise ValueError("pan_x/pan_y only apply to fit='crop_center' (blur_pad shows the whole frame)")
         return self
 
 

@@ -23,12 +23,20 @@ VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
 ZOOM_AMOUNT = 0.12  # how much photos zoom (12%)
 
 
-def fit_filter(fit: str, w: int, h: int, inp: str, out: str) -> str:
-    """Brings any frame to exactly w x h."""
+def fit_filter(fit: str, w: int, h: int, inp: str, out: str, pan_x: float = 0.0, pan_y: float = 0.0) -> str:
+    """Brings any frame to exactly w x h.
+
+    crop_center normally crops dead-center after the upscale; pan_x/pan_y (-1..1, see edl.py's
+    Clip) slide that crop window within whatever slack the upscale leaves on each axis - 0 is the
+    old centered behavior exactly. Only one axis typically HAS slack (scale locks one dimension to
+    an exact match), so panning on the other axis is naturally a no-op - no extra clamping needed.
+    """
     if fit == "crop_center":
+        x = f"(in_w-out_w)/2*(1+({pan_x}))" if pan_x else "(in_w-out_w)/2"
+        y = f"(in_h-out_h)/2*(1+({pan_y}))" if pan_y else "(in_h-out_h)/2"
         return (f"[{inp}]scale={w}:{h}:force_original_aspect_ratio=increase,"
-                f"crop={w}:{h}[{out}]")
-    # blur_pad: blurred background + the full frame centered
+                f"crop={w}:{h}:{x}:{y}[{out}]")
+    # blur_pad: blurred background + the full frame centered (no crop, so no pan either)
     return (f"[{inp}]split=2[bg][fg];"
             f"[bg]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=20:2[bgb];"
             f"[fg]scale={w}:{h}:force_original_aspect_ratio=decrease[fgs];"
@@ -84,7 +92,7 @@ def build_segment_cmd(c: Clip, info: MediaInfo, w: int, h: int, fps: int,
         speed_f = "" if c.speed == 1.0 else f"setpts=PTS/{c.speed:.4f},"
         # setpts must run BEFORE the fps filter: fps resamples to a frame count based on the
         # CURRENT duration, so the speed change has to already be applied for it to land right.
-        graph = (fit_filter(c.fit, w, h, "0:v", "f") +
+        graph = (fit_filter(c.fit, w, h, "0:v", "f", c.pan_x, c.pan_y) +
                  f";[f]{speed_f}fps={fps},{color_filter(c)},setsar=1,format=yuv420p{pad}[v]")
         take = raw_need + 0.2 if has_room else raw_main + 0.1
         return ["ffmpeg", "-y", "-v", "error", "-ss", f"{c.in_:.3f}", "-t", f"{take:.3f}",
@@ -97,7 +105,7 @@ def build_segment_cmd(c: Clip, info: MediaInfo, w: int, h: int, fps: int,
         z = f"{1 + ZOOM_AMOUNT}-{ZOOM_AMOUNT}*on/{frames}"
     else:
         z = "1"
-    graph = (fit_filter(c.fit, w * 2, h * 2, "0:v", "f") +
+    graph = (fit_filter(c.fit, w * 2, h * 2, "0:v", "f", c.pan_x, c.pan_y) +
              f";[f]zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
              f":d={frames}:s={w}x{h}:fps={fps},{color_filter(c)},setsar=1,format=yuv420p[v]")
     return ["ffmpeg", "-y", "-v", "error", "-i", str(info.path),

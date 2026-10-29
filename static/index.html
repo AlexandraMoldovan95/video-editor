@@ -66,6 +66,11 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .tl div .trim.r{right:-1px}
 .tl div .trim:hover,.tl div.trimming .trim{background:var(--acc)}
 .tl div.trimming{outline:2px solid var(--acc);outline-offset:-2px;z-index:3}
+.panpad{width:46px;height:46px;border:1px solid var(--line);border-radius:6px;position:relative;background:var(--panel2);cursor:crosshair;touch-action:none;flex:0 0 auto}
+.panpad::before,.panpad::after{content:'';position:absolute;background:var(--line)}
+.panpad::before{left:0;right:0;top:50%;height:1px}
+.panpad::after{top:0;bottom:0;left:50%;width:1px}
+.panpad .dot{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--acc);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 2px #0006}
 .clip{display:grid;grid-template-columns:28px 64px 1fr auto;gap:10px;align-items:start;background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:8px;margin-bottom:6px}
 .clip.sel{border-color:var(--acc)}
 .clip.locked{border-color:var(--lock)}
@@ -710,6 +715,7 @@ function clipRow(c, i) {
       ${i > 0 ? `<div class="field"><label>Transition</label><select data-f="tr_type"><option value="">direct cut</option>${TR_TYPES.map(t => `<option ${c.transition_in?.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <input type="number" data-f="tr_dur" step="0.05" min="0.15" max="1" value="${c.transition_in?.duration ?? 0.4}" ${c.transition_in ? '' : 'disabled'}><span class="hint">s</span></div>` : ''}
       <div class="field"><label>Framing</label><select data-f="fit"><option value="crop_center" ${c.fit === 'crop_center' ? 'selected' : ''}>center crop</option><option value="blur_pad" ${c.fit === 'blur_pad' ? 'selected' : ''}>blurred background</option></select></div>
+      ${c.fit === 'crop_center' ? `<div class="field"><label title="Slides the crop within whatever the frame doesn't show - only has room on whichever axis the crop is actually cutting into.">Reframe</label><div class="panpad"><i class="dot" style="left:${((c.pan_x ?? 0) * 50 + 50)}%;top:${((c.pan_y ?? 0) * 50 + 50)}%"></i></div><span class="hint">drag to re-center the crop</span></div>` : ''}
       ${c.in != null ? `<div class="field"><label title="Changes how fast the clip plays - the on-screen duration above updates with it. Original audio is time-stretched to match.">Speed</label><input type="range" data-f="speed" min="0.25" max="4" step="0.05" value="${c.speed ?? 1}"><span class="v">${fmt(c.speed ?? 1)}×</span></div>` : ''}
       <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
       <div class="adv">
@@ -753,10 +759,36 @@ function bindClips(area) {
         if (f === 'tr_type') c.transition_in = inp.value ? {type: inp.value, duration: c.transition_in?.duration ?? 0.4} : null;
         else if (f === 'tr_dur') { if (c.transition_in) c.transition_in.duration = +inp.value }
         else c[f] = inp.tagName === 'SELECT' ? inp.value : +inp.value;
+        if (f === 'fit' && c.fit !== 'crop_center') { c.pan_x = 0; c.pan_y = 0 }   // the server rejects a pan on blur_pad
         c.locked = true;
         if (inp.type === 'range') { inp.nextElementSibling.textContent = fmt(+inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
         else { saveEdl(); renderPlan() }
       });
+    });
+    const pad = row.querySelector('.panpad');
+    if (pad) pad.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      const c = clips[i];
+      const rect = pad.getBoundingClientRect();
+      const dot = pad.querySelector('.dot');
+      try { pad.setPointerCapture(e.pointerId) } catch {}
+      snapshotEdl();
+      const apply = ev => {
+        const px = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+        const py = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
+        c.pan_x = +((px * 2 - 1).toFixed(3));
+        c.pan_y = +((py * 2 - 1).toFixed(3));
+        dot.style.left = `${px * 100}%`; dot.style.top = `${py * 100}%`;
+      };
+      apply(e);
+      const onMove = ev => apply(ev);
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        c.locked = true; saveEdl();
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
     });
   });
 }
