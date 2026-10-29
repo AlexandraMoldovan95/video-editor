@@ -239,6 +239,29 @@ function bindAdvToggle(container) {
 }
 
 let CFG, DEMOS = [], P = null, selFile = null, selClip = null;
+let EDL_HISTORY = [], EDL_FUTURE = [];   // undo/redo over P.edl (manual edits only — see snapshotEdl)
+
+// ---------------- undo / redo ----------------
+function snapshotEdl() {
+  // call this BEFORE mutating P.edl, once per discrete user action (not once per 'input' tick)
+  if (!P.edl) return;
+  EDL_HISTORY.push(JSON.stringify(P.edl));
+  if (EDL_HISTORY.length > 200) EDL_HISTORY.shift();
+  EDL_FUTURE = [];
+}
+function clearHistory() { EDL_HISTORY = []; EDL_FUTURE = [] }
+function undo() {
+  if (!EDL_HISTORY.length) return;
+  EDL_FUTURE.push(JSON.stringify(P.edl));
+  P.edl = JSON.parse(EDL_HISTORY.pop());
+  selClip = null; renderPlan(); saveEdl();
+}
+function redo() {
+  if (!EDL_FUTURE.length) return;
+  EDL_HISTORY.push(JSON.stringify(P.edl));
+  P.edl = JSON.parse(EDL_FUTURE.pop());
+  selClip = null; renderPlan(); saveEdl();
+}
 const PRESET_FIELDS = ['target_duration', 'pace', 'color_look', 'vertical_fit', 'photo_motion', 'transition_style', 'text_style'];
 const TR_TYPES = ['fade', 'dissolve', 'fadeblack', 'fadewhite', 'wipeleft', 'slideleft', 'slideup', 'smoothleft', 'circleopen', 'circleclose'];
 const COLOR_KEYS = [['brightness', 'Brightness', -0.3, 0.3, 0.01], ['contrast', 'Contrast', 0.5, 2, 0.01],
@@ -266,7 +289,7 @@ async function loadProject(id) {
   P = await api(`/api/projects/${id}`);
   localStorageSet('proj', id);
   $('#projSel').value = id;
-  selFile = null; selClip = null;
+  selFile = null; selClip = null; clearHistory();
   renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderPlan(); renderDemoBtns();
   $('#player').removeAttribute('src'); $('#dl').hidden = true;
 }
@@ -506,7 +529,7 @@ async function loadDemo(key) {
   try {
     const r = await api(`/api/projects/${P.id}/demo/${key}`, {method: 'POST'});
     P.overrides = r.overrides ?? P.overrides;
-    await refresh(); selClip = null; renderSettings(); renderPlan();
+    await refresh(); selClip = null; clearHistory(); renderSettings(); renderPlan();
   } catch (e) { alertStatus('#planStatus', e.message, true) }
   renderDemoBtns();
 }
@@ -554,7 +577,7 @@ $('#planBtn').onclick = async () => {
   try {
     const {job} = await api(`/api/projects/${P.id}/plan`, {method: 'POST'});
     const r = await waitJob(job, '#planStatus', 'The AI is analyzing the frames');
-    await refresh(); selClip = null; renderPlan();
+    await refresh(); selClip = null; clearHistory(); renderPlan();
     alertStatus('#planStatus', `Plan ready: ${P.edl.clips.length} clips, ${fmt(r.total)}s`, false, true);
   } catch (e) { alertStatus('#planStatus', e.message, true) }
   $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = false;
@@ -579,7 +602,11 @@ function renderPlan() {
   area.innerHTML = `
     ${demoInfo ? `<div class="hint" style="margin-bottom:8px">\u{1F9EA} Pre-built example: <b style="color:var(--text)">${esc(demoInfo.label)}</b> — no AI call was used for this plan.</div>` : ''}
     ${P.reasoning ? `<div class="reason">${esc(P.reasoning)}</div>` : ''}
-    <div class="row"><b>Timeline</b><span class="total ${off ? 'off' : ''}">${fmt(total)}s / target ${target}s</span><span class="hint" id="edlMsg"></span></div>
+    <div class="row"><b>Timeline</b><span class="total ${off ? 'off' : ''}">${fmt(total)}s / target ${target}s</span>
+      <button class="small" id="undoBtn" title="Undo (Ctrl+Z)" ${EDL_HISTORY.length ? '' : 'disabled'}>↶ Undo</button>
+      <button class="small" id="redoBtn" title="Redo (Ctrl+Y)" ${EDL_FUTURE.length ? '' : 'disabled'}>↷ Redo</button>
+      <span class="hint" id="edlMsg"></span></div>
+    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · Del removes the selected clip · Ctrl+Z/Y undo/redo.</div>
     <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}"><span>${c.locked ? '🔒' : i + 1}</span></div>`).join('')}</div>${beatTicks(total)}</div>
     ${textTrack(total)}
     ${clips.map((c, i) => clipRow(c, i)).join('')}
@@ -590,6 +617,8 @@ function renderPlan() {
   area.querySelectorAll('.tl div').forEach(d => d.onclick = () => { selClip = selClip === +d.dataset.i ? null : +d.dataset.i; renderPlan(); area.querySelector(`.clip[data-i="${d.dataset.i}"]`)?.scrollIntoView({block: 'nearest'}) });
   bindClips(area);
   bindTexts(area, total);
+  $('#undoBtn').onclick = undo;
+  $('#redoBtn').onclick = redo;
   const sc = $('#subChk');
   if (sc) sc.onchange = async () => { P.subtitles = sc.checked; await api(`/api/projects/${P.id}/settings`, jsonOpt('PUT', {preset: P.preset, overrides: P.overrides, subtitles: sc.checked})); await refresh(); renderPlan() };
 }
@@ -618,6 +647,7 @@ function bindTexts(area, total) {
   $('#addText').onclick = () => {
     const st = Math.min(Math.max(0, $('#player').currentTime || 0), Math.max(0, total - 2.5));
     const item = {content: 'New text', start: +fmt(st), end: +fmt(Math.min(total, st + 2.5)), position: 'bottom', style: 'caption', locked: true};
+    snapshotEdl();
     tx.push(item); tx.sort((a, b) => a.start - b.start); saveEdl(); renderPlan();
     const inp = $(`.txt[data-k="${tx.indexOf(item)}"] input[type=text]`);
     if (inp) { inp.scrollIntoView({block: 'center'}); inp.select() }
@@ -626,12 +656,14 @@ function bindTexts(area, total) {
   area.querySelectorAll('.txt').forEach(row => {
     const k = +row.dataset.k;
     row.querySelectorAll('[data-ta]').forEach(b => b.onclick = () => {
+      snapshotEdl();
       if (b.dataset.ta === 'lock') tx[k].locked = !tx[k].locked;
       if (b.dataset.ta === 'del') tx.splice(k, 1);
       if (b.dataset.ta === 'now') { const d = tx[k].end - tx[k].start; tx[k].start = +fmt($('#player').currentTime || 0); tx[k].end = +fmt(Math.min(total, tx[k].start + d)); tx[k].locked = true }
       saveEdl(); renderPlan();
     });
     row.querySelectorAll('[data-t]').forEach(inp => inp.addEventListener('change', () => {
+      snapshotEdl();
       const f = inp.dataset.t;
       tx[k][f] = inp.type === 'number' ? +inp.value : inp.value;
       tx[k].locked = true;
@@ -693,6 +725,7 @@ function bindClips(area) {
     bindAdvToggle(row);
     row.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       const a = b.dataset.a;
+      if (a !== 'edit') snapshotEdl();
       if (a === 'lock') clips[i].locked = !clips[i].locked;
       if (a === 'edit') selClip = selClip === i ? null : i;
       if (a === 'del') { clips.splice(i, 1); selClip = null }
@@ -700,15 +733,19 @@ function bindClips(area) {
       if (a !== 'edit') saveEdl();
       renderPlan();
     });
-    row.querySelectorAll('[data-f]').forEach(inp => inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
-      const f = inp.dataset.f, c = clips[i];
-      if (f === 'tr_type') c.transition_in = inp.value ? {type: inp.value, duration: c.transition_in?.duration ?? 0.4} : null;
-      else if (f === 'tr_dur') { if (c.transition_in) c.transition_in.duration = +inp.value }
-      else c[f] = inp.tagName === 'SELECT' ? inp.value : +inp.value;
-      c.locked = true;
-      if (inp.type === 'range') { inp.nextElementSibling.textContent = fmt(+inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
-      else { saveEdl(); renderPlan() }
-    }));
+    row.querySelectorAll('[data-f]').forEach(inp => {
+      if (inp.type === 'range') inp.addEventListener('pointerdown', () => snapshotEdl());
+      inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
+        const f = inp.dataset.f, c = clips[i];
+        if (inp.type !== 'range') snapshotEdl();
+        if (f === 'tr_type') c.transition_in = inp.value ? {type: inp.value, duration: c.transition_in?.duration ?? 0.4} : null;
+        else if (f === 'tr_dur') { if (c.transition_in) c.transition_in.duration = +inp.value }
+        else c[f] = inp.tagName === 'SELECT' ? inp.value : +inp.value;
+        c.locked = true;
+        if (inp.type === 'range') { inp.nextElementSibling.textContent = fmt(+inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
+        else { saveEdl(); renderPlan() }
+      });
+    });
   });
 }
 
@@ -735,6 +772,41 @@ $('#fcpBtn').onclick = async () => {
 };
 $('#draftBtn').onclick = () => doRender(false);
 $('#finalBtn').onclick = () => doRender(true);
+
+// ---------------- keyboard shortcuts ----------------
+// Space/J/K/L act on whichever preview video has something loaded: the per-file hint preview
+// (#hv, when a file's detail panel is open) takes priority over the main output preview (#player).
+// J/L are an honest re-reading of the classic shuttle keys as "step 1s back/forward" - an HTML5
+// <video> element has no variable-speed reverse playback to drive a literal J/K/L shuttle.
+function activeVideo() {
+  const hv = document.getElementById('hv');
+  if (hv && hv.src) return hv;
+  const pl = $('#player');
+  return pl && pl.src ? pl : null;
+}
+document.addEventListener('keydown', e => {
+  const tag = (document.activeElement || {}).tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.metaKey && !e.ctrlKey) return;   // leave Cmd-combos to the OS/browser
+  const k = e.key;
+  if (e.ctrlKey && k.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return }
+  if (e.ctrlKey && (k.toLowerCase() === 'y' || (k.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return }
+  if (e.ctrlKey || e.altKey) return;    // don't fight any other browser shortcut
+  const v = activeVideo();
+  if (k === ' ') { e.preventDefault(); if (v) { if (v.paused) v.play().catch(() => {}); else v.pause() } }
+  else if (k === 'j' || k === 'J') { if (v) v.currentTime = Math.max(0, v.currentTime - 1) }
+  else if (k === 'k' || k === 'K') { if (v) v.pause() }
+  else if (k === 'l' || k === 'L') { if (v) v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 1) }
+  else if (k === 'i' || k === 'I') { $('#setIn')?.click() }
+  else if (k === 'o' || k === 'O') { $('#setOut')?.click() }
+  else if (k === 'Delete' || k === 'Backspace') {
+    if (P && P.edl && selClip != null && P.edl.clips[selClip]) {
+      e.preventDefault();
+      snapshotEdl();
+      P.edl.clips.splice(selClip, 1); selClip = null; saveEdl(); renderPlan();
+    }
+  }
+});
 
 init().catch(e => alertStatus('#planStatus', 'The server is not responding: ' + e.message, true));
 </script>
