@@ -60,7 +60,12 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
 .tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:pointer;min-width:6px;background-size:cover;background-position:center;position:relative}
 .tl div.sel{outline:2px solid var(--acc);outline-offset:-2px}
-.tl div span{background:#000a;padding:0 3px;border-radius:3px}
+.tl div span{background:#000a;padding:0 3px;border-radius:3px;pointer-events:none}
+.tl div .trim{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2;touch-action:none}
+.tl div .trim.l{left:-1px}
+.tl div .trim.r{right:-1px}
+.tl div .trim:hover,.tl div.trimming .trim{background:var(--acc)}
+.tl div.trimming{outline:2px solid var(--acc);outline-offset:-2px;z-index:3}
 .clip{display:grid;grid-template-columns:28px 64px 1fr auto;gap:10px;align-items:start;background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:8px;margin-bottom:6px}
 .clip.sel{border-color:var(--acc)}
 .clip.locked{border-color:var(--lock)}
@@ -606,8 +611,8 @@ function renderPlan() {
       <button class="small" id="undoBtn" title="Undo (Ctrl+Z)" ${EDL_HISTORY.length ? '' : 'disabled'}>↶ Undo</button>
       <button class="small" id="redoBtn" title="Redo (Ctrl+Y)" ${EDL_FUTURE.length ? '' : 'disabled'}>↷ Redo</button>
       <span class="hint" id="edlMsg"></span></div>
-    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · Del removes the selected clip · Ctrl+Z/Y undo/redo.</div>
-    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}"><span>${c.locked ? '🔒' : i + 1}</span></div>`).join('')}</div>${beatTicks(total)}</div>
+    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it.</div>
+    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
     ${textTrack(total)}
     ${clips.map((c, i) => clipRow(c, i)).join('')}
     ${Object.keys(P.transcripts || {}).length ? `<label class="row hint" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="subChk" ${P.subtitles ? 'checked' : ''}>
@@ -617,6 +622,7 @@ function renderPlan() {
   area.querySelectorAll('.tl div').forEach(d => d.onclick = () => { selClip = selClip === +d.dataset.i ? null : +d.dataset.i; renderPlan(); area.querySelector(`.clip[data-i="${d.dataset.i}"]`)?.scrollIntoView({block: 'nearest'}) });
   bindClips(area);
   bindTexts(area, total);
+  bindTimelineDrag(area);
   $('#undoBtn').onclick = undo;
   $('#redoBtn').onclick = redo;
   const sc = $('#subChk');
@@ -744,6 +750,72 @@ function bindClips(area) {
         c.locked = true;
         if (inp.type === 'range') { inp.nextElementSibling.textContent = fmt(+inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
         else { saveEdl(); renderPlan() }
+      });
+    });
+  });
+}
+// Drag-trim: pulling a clip's left/right edge on the timeline bar changes its in/out (video)
+// or duration (photo) live. The clip is a flex item (flex: duration), so during the drag we
+// just set its own flex value to the candidate duration and the row reflows for free - no
+// pixel math for the other clips. The real values only get written (and validated server-side)
+// on release; a drag under ~20ms worth of seconds is treated as an accidental click, not an edit.
+function bindTimelineDrag(area) {
+  const tlDiv = area.querySelector('.tl');
+  if (!tlDiv) return;
+  tlDiv.querySelectorAll(':scope > [data-i]').forEach(seg => {
+    const i = +seg.dataset.i;
+    seg.querySelectorAll('.trim').forEach(handle => {
+      handle.onclick = e => e.stopPropagation();   // don't let the drag's click bubble into clip selection
+      handle.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        const c = P.edl.clips[i];
+        if (!c) return;
+        const m = mediaOf(c.source) || {};
+        const side = handle.dataset.side;
+        const startX = e.clientX;
+        const startRect = seg.getBoundingClientRect();
+        const startDur = clipDur(c);
+        const pxPerSec = startRect.width / Math.max(0.01, startDur);
+        const origIn = c.in, origOut = c.out, origDuration = c.duration;
+        const span = seg.querySelector('span');
+        const origSpanText = span.textContent;
+        try { handle.setPointerCapture(e.pointerId) } catch {}
+        seg.classList.add('trimming');
+        snapshotEdl();
+        let lastDur = startDur;
+        const onMove = ev => {
+          const deltaSec = (ev.clientX - startX) / pxPerSec;
+          let newDur;
+          if (c.in != null) {
+            if (side === 'r') {
+              c.out = +Math.min((m.duration || origOut) + 0.05, Math.max(origIn + 0.5, origOut + deltaSec)).toFixed(2);
+            } else {
+              c.in = +Math.max(0, Math.min(origOut - 0.5, origIn + deltaSec)).toFixed(2);
+            }
+            newDur = c.out - c.in;
+          } else {
+            newDur = +Math.min(4.0, Math.max(2.0, origDuration + deltaSec)).toFixed(2);
+            c.duration = newDur;
+          }
+          lastDur = newDur;
+          seg.style.flex = newDur;
+          span.textContent = fmt(newDur) + 's';
+        };
+        const onUp = () => {
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          seg.classList.remove('trimming');
+          if (Math.abs(lastDur - startDur) < 0.02) {
+            EDL_HISTORY.pop();   // negligible drag (a click, not a trim) - don't pollute undo history
+            c.in = origIn; c.out = origOut; c.duration = origDuration;
+            seg.style.flex = startDur; span.textContent = origSpanText;
+            return;
+          }
+          c.locked = true;
+          saveEdl(); renderPlan();
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
       });
     });
   });
