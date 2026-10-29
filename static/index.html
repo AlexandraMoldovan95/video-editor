@@ -610,8 +610,9 @@ function renderPlan() {
     <div class="row"><b>Timeline</b><span class="total ${off ? 'off' : ''}">${fmt(total)}s / target ${target}s</span>
       <button class="small" id="undoBtn" title="Undo (Ctrl+Z)" ${EDL_HISTORY.length ? '' : 'disabled'}>↶ Undo</button>
       <button class="small" id="redoBtn" title="Redo (Ctrl+Y)" ${EDL_FUTURE.length ? '' : 'disabled'}>↷ Redo</button>
+      <button class="small" id="splitBtn" title="Split the video clip under the preview's current playback position (S)">✂ Split</button>
       <span class="hint" id="edlMsg"></span></div>
-    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it.</div>
+    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · S splits the clip at the preview's position · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it.</div>
     <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
     ${textTrack(total)}
     ${clips.map((c, i) => clipRow(c, i)).join('')}
@@ -625,6 +626,7 @@ function renderPlan() {
   bindTimelineDrag(area);
   $('#undoBtn').onclick = undo;
   $('#redoBtn').onclick = redo;
+  $('#splitBtn').onclick = trySplit;
   const sc = $('#subChk');
   if (sc) sc.onchange = async () => { P.subtitles = sc.checked; await api(`/api/projects/${P.id}/settings`, jsonOpt('PUT', {preset: P.preset, overrides: P.overrides, subtitles: sc.checked})); await refresh(); renderPlan() };
 }
@@ -754,6 +756,41 @@ function bindClips(area) {
     });
   });
 }
+// ---------------- split ----------------
+function showEdlMsg(msg, isErr) {
+  const el = $('#edlMsg'); if (!el) return;
+  el.textContent = msg; el.style.color = isErr ? 'var(--err)' : 'var(--ok)';
+}
+// Which clip (and offset into it) sits at timeline time t, in the same "final video seconds"
+// convention already used for text start/end and the beat ticks (i.e. it does not subtract
+// crossfade overlap - same simplification as the rest of the timeline UI).
+function clipAtTimelineTime(t) {
+  let acc = 0;
+  for (let i = 0; i < P.edl.clips.length; i++) {
+    const d = clipDur(P.edl.clips[i]);
+    if (t < acc + d) return {idx: i, offset: t - acc};
+    acc += d;
+  }
+  return null;
+}
+function trySplit() {
+  if (!P.edl) return;
+  const player = $('#player');
+  if (!player || !player.src) return showEdlMsg('Render a draft first, then move the preview to where you want to cut.', true);
+  const hit = clipAtTimelineTime(player.currentTime);
+  if (!hit) return showEdlMsg('Move the preview inside the timeline to split a clip there.', true);
+  const c = P.edl.clips[hit.idx];
+  if (c.in == null) return showEdlMsg("Photos can't be split - only video clips.", true);
+  const dur = c.out - c.in;
+  if (hit.offset < 0.5 || dur - hit.offset < 0.5) return showEdlMsg('Too close to the edge of this clip to split (min 0.5s on each side).', true);
+  snapshotEdl();
+  const splitPoint = +(c.in + hit.offset).toFixed(2);
+  const first = {...c, out: splitPoint, locked: true};
+  const second = {...c, in: splitPoint, transition_in: null, locked: true};
+  P.edl.clips.splice(hit.idx, 1, first, second);
+  selClip = hit.idx + 1;
+  saveEdl(); renderPlan();
+}
 // Drag-trim: pulling a clip's left/right edge on the timeline bar changes its in/out (video)
 // or duration (photo) live. The clip is a flex item (flex: duration), so during the drag we
 // just set its own flex value to the candidate duration and the row reflows for free - no
@@ -871,6 +908,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'l' || k === 'L') { if (v) v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 1) }
   else if (k === 'i' || k === 'I') { $('#setIn')?.click() }
   else if (k === 'o' || k === 'O') { $('#setOut')?.click() }
+  else if (k === 's' || k === 'S') { $('#splitBtn')?.click() }
   else if (k === 'Delete' || k === 'Backspace') {
     if (P && P.edl && selClip != null && P.edl.clips[selClip]) {
       e.preventDefault();
