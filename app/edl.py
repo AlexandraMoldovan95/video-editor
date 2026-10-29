@@ -32,7 +32,9 @@ class TextItem(BaseModel):
     content: str = Field(min_length=1, max_length=80)
     start: float = Field(ge=0)
     end: float = Field(gt=0)
-    position: Literal["top", "center", "bottom"] = "bottom"
+    position: Literal["top", "center", "bottom"] = "bottom"   # used while x/y are unset (AI-placed texts)
+    x: float | None = Field(None, ge=0.0, le=1.0)   # manual free position: fraction of width, block CENTER
+    y: float | None = Field(None, ge=0.0, le=1.0)   # same, fraction of height. Either set -> overrides `position`.
     style: Literal["title", "caption", "cta", "subtitle"] = "caption"   # subtitle = generated from Whisper
     locked: bool = False
 
@@ -169,8 +171,13 @@ def text_errors(edl: EDL) -> list[str]:
             errs.append(f"the text '{t.content}' starts after the end of the video ({total:.1f}s)")
         elif t.end > total:
             t.end = round(total, 2)   # silently trim whatever runs past the end
+    # the same-position/overlapping-time check is a cheap stand-in for "would these two texts
+    # visually collide" - it doesn't apply once a text has been manually, freely positioned: the
+    # user placed it while watching a live preview, so trust their eyes over the heuristic.
     by_pos: dict[str, list[TextItem]] = {}
     for t in edl.texts:
+        if t.x is not None or t.y is not None:
+            continue
         by_pos.setdefault(t.position, []).append(t)
     for pos, items in by_pos.items():
         items.sort(key=lambda t: t.start)

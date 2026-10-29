@@ -175,7 +175,8 @@ def build_request(media: dict[str, MediaInfo], preset_name: str, overrides: dict
                           "Harmonize the color with the locked clips. They will be reinserted at their indicated positions."})
 
     if locked_texts:
-        tl = [f"- \"{t.content}\" {t.start}-{t.end}s ({t.style}, {t.position})" for t in locked_texts]
+        tl = [f"- \"{t.content}\" {t.start}-{t.end}s ({t.style}, "
+              f"{'a custom free position' if (t.x is not None or t.y is not None) else t.position})" for t in locked_texts]
         content.append({"type": "text", "text": "## Texts LOCKED by the user (they stay, do NOT include them in your response; "
                         "don't add other texts that overlap them in time)\n" + "\n".join(tl)})
 

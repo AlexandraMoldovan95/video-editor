@@ -77,6 +77,8 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .panpad::before{left:0;right:0;top:50%;height:1px}
 .panpad::after{top:0;bottom:0;left:50%;width:1px}
 .panpad .dot{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--acc);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 2px #0006}
+.textpad{width:54px;height:96px;border:1px solid var(--line);border-radius:6px;position:relative;background:var(--panel2);cursor:crosshair;touch-action:none;flex:0 0 auto}
+.textpad .dot{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--acc);transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 2px #0006}
 .clip{display:grid;grid-template-columns:28px 64px 1fr auto;gap:10px;align-items:start;background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:8px;margin-bottom:6px}
 .clip.sel{border-color:var(--acc)}
 .clip.locked{border-color:var(--lock)}
@@ -697,6 +699,8 @@ function textTrack(total) {
 }
 function textRow(t, k, total) {
   const opt = (obj, v) => Object.entries(obj).map(([a, b]) => `<option value="${a}" ${a === v ? 'selected' : ''}>${b}</option>`).join('');
+  const free = t.x != null || t.y != null;
+  const cx = t.x ?? 0.5, cy = t.y ?? ({top: 0.18, center: 0.5, bottom: 0.78}[t.position] ?? 0.78);
   return `<div class="txt ${t.locked ? 'locked' : ''}" data-k="${k}">
     <input type="text" data-t="content" maxlength="80" value="${esc(t.content)}">
     <div class="row" style="gap:4px"><button class="small lockbtn ${t.locked ? 'on' : ''}" data-ta="lock">${t.locked ? '🔒 Locked' : 'Lock'}</button><button class="small" data-ta="del">✕</button></div>
@@ -704,8 +708,13 @@ function textRow(t, k, total) {
       <span class="hint">from</span><input type="number" data-t="start" step="0.1" min="0" max="${fmt(total)}" value="${t.start}">
       <span class="hint">to</span><input type="number" data-t="end" step="0.1" min="0" max="${fmt(total)}" value="${t.end}">
       <select data-t="style">${opt(STYLE_LABELS, t.style)}</select>
-      <select data-t="position">${opt(POS_LABELS, t.position)}</select>
+      <select data-t="position" ${free ? 'disabled title="clear the free position to use this again"' : ''}>${opt(POS_LABELS, t.position)}</select>
       <button class="small" data-ta="now" title="starts at the current second in the preview">▶ = now</button>
+    </div>
+    <div class="row" style="grid-column:1/3;align-items:flex-start;gap:8px;margin-top:2px">
+      <div class="field"><label>Free position</label><div class="textpad"><i class="dot" style="left:${cx * 100}%;top:${cy * 100}%"></i></div></div>
+      <span class="hint">${free ? 'drag to fine-tune the spot on the frame.' : 'drag on the mini-frame to place this text anywhere, overriding the preset above.'}
+        ${free ? `<button class="small ghost" data-ta="unfree">Use ${POS_LABELS[t.position]} preset instead</button>` : ''}</span>
     </div></div>`;
 }
 function bindTexts(area, total) {
@@ -726,6 +735,7 @@ function bindTexts(area, total) {
       if (b.dataset.ta === 'lock') tx[k].locked = !tx[k].locked;
       if (b.dataset.ta === 'del') tx.splice(k, 1);
       if (b.dataset.ta === 'now') { const d = tx[k].end - tx[k].start; tx[k].start = +fmt($('#player').currentTime || 0); tx[k].end = +fmt(Math.min(total, tx[k].start + d)); tx[k].locked = true }
+      if (b.dataset.ta === 'unfree') { tx[k].x = null; tx[k].y = null; tx[k].locked = true }
       saveEdl(); renderPlan();
     });
     row.querySelectorAll('[data-t]').forEach(inp => inp.addEventListener('change', () => {
@@ -736,6 +746,29 @@ function bindTexts(area, total) {
       if (f === 'start') tx.sort((a, b) => a.start - b.start);
       saveEdl(); renderPlan();
     }));
+    const pad = row.querySelector('.textpad');
+    if (pad) pad.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      const rect = pad.getBoundingClientRect();
+      const dot = pad.querySelector('.dot');
+      try { pad.setPointerCapture(e.pointerId) } catch {}
+      snapshotEdl();
+      const apply = ev => {
+        const px = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+        const py = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
+        tx[k].x = +px.toFixed(3); tx[k].y = +py.toFixed(3);
+        dot.style.left = `${px * 100}%`; dot.style.top = `${py * 100}%`;
+      };
+      apply(e);
+      const onMove = ev => apply(ev);
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        tx[k].locked = true; saveEdl(); renderPlan();   // renderPlan needed: entering "free" mode disables the preset dropdown
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
   });
 }
 function beatTicks(total) {

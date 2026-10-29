@@ -10,6 +10,8 @@ Exports an EDITABLE timeline that uses the ORIGINAL files (not the rendered MP4)
   NOT TRANSFERRED: clip speed (slow-mo/timelapse) - a sped-up/slowed-down clip is laid out at its
     OWN ORIGINAL length and speed instead (no FCPXML timeMap), so the cut points stay honest;
     redo the retime by hand in DaVinci/FCP if you want to keep the effect
+  NOT TRANSFERRED: a text's free x/y position - it lands at its `position` field's old top/
+    center/bottom spot instead; re-drag it in DaVinci/FCP if you moved it off that spot
 
 FCPXML rules worth knowing:
   - times are rational fractions ("90/30s"); the sequence is 30 fps -> everything in 1/30s frames

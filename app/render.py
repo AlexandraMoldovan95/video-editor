@@ -165,7 +165,17 @@ def text_filters(texts: list[TextItem], w: int, h: int, work: Path) -> list[str]
         lines = wrap(t.content, max(8, int(0.84 * w / (fs * 0.56))))
         line_h = round(fs * 1.3)
         block = line_h * len(lines)
-        y0 = {"top": round(0.13 * h), "center": round((h - block) / 2), "bottom": round(0.70 * h - block)}[t.position]
+        free = t.x is not None or t.y is not None
+        if free:
+            # (x, y) is the CENTER of the whole (possibly multi-line) block, as a fraction of the
+            # frame - each line still gets its own x expression below so it stays centered on cx
+            # even though lines can differ in width.
+            cx, cy = (t.x if t.x is not None else 0.5), (t.y if t.y is not None else 0.5)
+            x_expr = f"{cx:.4f}*w-text_w/2"
+            y0 = round(cy * h - block / 2)
+        else:
+            x_expr = "(w-text_w)/2"
+            y0 = {"top": round(0.13 * h), "center": round((h - block) / 2), "bottom": round(0.70 * h - block)}[t.position]
         st, en = t.start, t.end
         alpha = (f"if(lt(t,{st + TEXT_FADE:.3f}),(t-{st:.3f})/{TEXT_FADE},"
                  f"if(gt(t,{en - TEXT_FADE:.3f}),({en:.3f}-t)/{TEXT_FADE},1))")
@@ -181,7 +191,7 @@ def text_filters(texts: list[TextItem], w: int, h: int, work: Path) -> list[str]
             name = f"t{k}_{li}.txt"
             (work / name).write_text(line, encoding="utf-8")
             out.append(f"drawtext=fontfile=font.ttf:textfile={name}:fontsize={fs}:{look}"
-                       f":x=(w-text_w)/2:y={y0 + li * line_h}"
+                       f":x={x_expr}:y={y0 + li * line_h}"
                        f":alpha='{alpha}':enable='between(t,{st:.3f},{en:.3f})'")
     return out
 
