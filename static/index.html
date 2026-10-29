@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Editor</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;--text:#e7e9ee;--muted:#8a91a0;
+  --acc:#ff7a45;--acc2:#ffb38f;--ok:#3ecf8e;--warn:#f5b942;--err:#ff5d5d;--lock:#7aa2ff;
+  --r:10px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-size:14px}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+header h1 span{color:var(--acc)}
+header .sp{flex:1}
+select,input,textarea,button{font:inherit;color:inherit}
+select,input[type=number],input[type=text],textarea{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+textarea{width:100%;resize:vertical;min-height:54px}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#1a0d06;font-weight:650}
+button.primary:hover{background:var(--acc2)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.small{padding:3px 8px;font-size:12px}
+button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+.layout{display:grid;grid-template-columns:360px 1fr 340px;gap:12px;padding:12px;height:calc(100vh - 53px)}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:auto;display:flex;flex-direction:column}
+.col>h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0;padding:12px 14px 8px;position:sticky;top:0;background:var(--panel);z-index:2}
+.sec{padding:0 14px 14px}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:16px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--acc);color:var(--text)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.card{background:var(--panel2);border:1.5px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;position:relative}
+.card.sel{border-color:var(--acc)}
+.card.excl{opacity:.4}
+.card img{width:100%;height:110px;object-fit:cover;display:block;background:#000}
+.card .nm{font-size:11px;padding:5px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .mt{font-size:10.5px;color:var(--muted);padding:0 6px 6px}
+.badges{position:absolute;top:4px;left:4px;display:flex;gap:3px;flex-wrap:wrap}
+.b{font-size:10px;padding:1px 5px;border-radius:4px;background:#000a;color:#fff}
+.b.must{background:var(--ok);color:#06150e}.b.ex{background:var(--err)}.b.set{background:var(--lock);color:#0a1330}
+.field{display:flex;align-items:center;gap:8px;margin:7px 0}
+.field>label{width:92px;color:var(--muted);font-size:12.5px;flex-shrink:0}
+.field input[type=number]{width:72px}
+.field input[type=range]{flex:1;accent-color:var(--acc)}
+.field .v{width:40px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px;background:transparent}
+.seg button.on{background:var(--acc);color:#1a0d06;font-weight:600}
+.panel{background:var(--panel2);border-radius:var(--r);padding:10px 12px;margin-top:12px}
+.panel .field>label{width:80px}
+.panel .seg button{padding:4px 8px;font-size:12.5px}
+.panel h3{margin:0 0 6px;font-size:13px}
+.panel video{width:100%;max-height:220px;background:#000;border-radius:6px}
+.hint{color:var(--muted);font-size:12px;line-height:1.4}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
+.tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:pointer;min-width:6px;background-size:cover;background-position:center;position:relative}
+.tl div.sel{outline:2px solid var(--acc);outline-offset:-2px}
+.tl div span{background:#000a;padding:0 3px;border-radius:3px}
+.clip{display:grid;grid-template-columns:28px 64px 1fr auto;gap:10px;align-items:start;background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:8px;margin-bottom:6px}
+.clip.sel{border-color:var(--acc)}
+.clip.locked{border-color:var(--lock)}
+.clip .ix{color:var(--muted);font-variant-numeric:tabular-nums;padding-top:4px}
+.clip img{width:64px;height:64px;object-fit:cover;border-radius:5px}
+.clip .src{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clip .ctrl{display:flex;flex-direction:column;gap:4px}
+.clip .det{grid-column:2/5}
+.lockbtn.on{background:var(--lock);border-color:var(--lock);color:#0a1330}
+.reason{background:var(--panel2);border-left:3px solid var(--acc);padding:10px 12px;border-radius:6px;line-height:1.45;margin-bottom:10px}
+.status{font-size:12.5px;padding:8px 10px;border-radius:7px;background:var(--panel2);margin-top:8px}
+.status.err{color:var(--err)}.status.ok{color:var(--ok)}
+.preview video{width:100%;aspect-ratio:9/16;background:#000;border-radius:8px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px}
+.kv span:nth-child(odd){color:var(--muted)}
+.energy{display:flex;align-items:flex-end;height:34px;gap:1px;margin:6px 0 2px;cursor:pointer}
+.energy div{flex:1;background:#3a4150;border-radius:1px 1px 0 0;min-height:2px}
+.energy div.in{background:var(--acc)}
+.tlwrap{position:relative}
+.ticks{position:absolute;inset:0;pointer-events:none}
+.ticks i{position:absolute;top:-4px;bottom:-4px;width:1px;background:#ffffff40}
+.ticks i.bar{background:#ffffffa0;width:2px}
+.panel audio{width:100%;height:34px;margin-top:4px}
+.trk{position:relative;height:18px;margin:-4px 0 10px;background:var(--panel2);border-radius:5px}
+.trk div{position:absolute;top:2px;bottom:2px;border-radius:4px;font-size:10px;color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;cursor:pointer;line-height:14px}
+.trk .title{background:#7a5cff}.trk .subtitle{background:#0e7490;opacity:.85}.trk .caption{background:#4b5563}.trk .cta{background:var(--acc);color:#1a0d06}
+.trk div.locked{outline:1.5px solid var(--lock)}
+.txt{display:grid;grid-template-columns:1fr auto;gap:6px 10px;background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:8px;margin-bottom:6px}
+.txt.locked{border-color:var(--lock)}
+.txt input[type=text]{width:100%}
+.txt .row input[type=number]{width:64px}
+.trb{font-size:10.5px;color:var(--acc2)}
+.tl div.hastr::before{content:'';position:absolute;left:-5px;top:4px;bottom:4px;width:9px;background:linear-gradient(90deg,transparent,#fff8,transparent);z-index:1}
+.empty{color:var(--muted);text-align:center;padding:30px 10px}
+.total{font-variant-numeric:tabular-nums}
+.total.off{color:var(--warn)}
+.adv{display:none}
+.showAdv .adv{display:block}
+.advToggleRow{margin-top:8px}
+@media (max-width:1100px){.layout{grid-template-columns:1fr;height:auto}.col{max-height:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Video <span>Editor</span></h1>
+  <select id="projSel" title="Projects"></select>
+  <button id="newProj">+ New project</button>
+  <div class="sp"></div>
+  <span class="hint" id="usage"></span>
+</header>
+
+<div class="layout">
+  <!-- ======== MATERIAL ======== -->
+  <section class="col">
+    <h2>1 · Material</h2>
+    <div class="sec">
+      <div class="drop" id="drop">Drag videos and photos here<br><small>or click to choose</small></div>
+      <input type="file" id="fileIn" multiple accept="video/*,image/*" hidden>
+      <div class="grid" id="grid"></div>
+
+      <div class="panel" id="hintPanel" hidden></div>
+
+      <div class="panel" id="trPanel" hidden></div>
+
+      <div class="panel">
+        <h3>Example video <span class="hint">(optional — pace + style)</span></h3>
+        <div class="row">
+          <span id="exName" class="hint">none</span>
+          <div class="sp" style="flex:1"></div>
+          <button class="small" id="exBtn">Choose</button>
+          <button class="small" id="exDel" hidden>Delete</button>
+        </div>
+        <input type="file" id="exIn" accept="video/*" hidden>
+      </div>
+
+      <div class="panel" id="musicPanel">
+        <h3>Music <span class="hint">(optional)</span></h3>
+        <div class="row">
+          <span id="muName" class="hint">no track</span>
+          <div style="flex:1"></div>
+          <button class="small" id="muBtn">Choose</button>
+          <button class="small" id="muDel" hidden>Delete</button>
+        </div>
+        <input type="file" id="muIn" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" hidden>
+        <div id="muBody" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== PLAN ======== -->
+  <section class="col">
+    <h2>2 · Edit plan</h2>
+    <div class="sec">
+      <div class="panel" style="margin-top:0">
+        <div class="row" style="margin-bottom:6px">
+          <label class="hint">Preset</label>
+          <select id="preset"></select>
+          <span class="hint">fields you change take priority</span>
+        </div>
+        <div class="row">
+          <div class="field"><label>Target duration</label><select id="f_target_duration"><option>15</option><option>30</option><option>45</option><option>60</option></select></div>
+          <div class="field"><label>Pace</label><select id="f_pace"><option>slow</option><option>medium</option><option>fast</option></select></div>
+          <div class="field"><label>Color look</label><select id="f_color_look"><option>neutral</option><option>warm</option><option>cool</option><option>contrast</option><option>pastel</option></select></div>
+          <div class="field"><label>Vertical fit</label><select id="f_vertical_fit"><option value="crop_center">center crop</option><option value="blur_pad">blurred background</option></select></div>
+          <div class="field"><label>Photos</label><select id="f_photo_motion"><option value="zoom_in">zoom in</option><option value="zoom_out">zoom out</option><option value="static">static</option></select></div>
+          <div class="field"><label>Transitions</label><select id="f_transition_style"><option value="cuts">cuts only</option><option value="subtle">subtle</option><option value="dynamic">dynamic</option></select></div>
+          <div class="field"><label>Text</label><select id="f_text_style"><option value="none">none</option><option value="title_only">title only</option><option value="story">story</option></select></div>
+        </div>
+        <textarea id="f_notes" placeholder="Instructions for the AI (e.g. start with the waterfall, calm ending)"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="primary" id="planBtn">Generate plan</button>
+          <span class="hint" id="planHint"></span>
+        </div>
+        <div class="status" id="planStatus" hidden></div>
+      </div>
+
+      <div id="planArea" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ======== PREVIEW ======== -->
+  <section class="col preview">
+    <h2>3 · Preview &amp; export</h2>
+    <div class="sec">
+      <video id="player" controls playsinline></video>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" id="draftBtn">Render draft</button>
+        <button id="finalBtn">Render final</button>
+      </div>
+      <label class="row hint" id="muteRow" style="margin-top:8px;cursor:pointer" hidden>
+        <input type="checkbox" id="muteChk"> Export without music
+      </label>
+      <div class="hint" id="muteHint" hidden style="margin-top:2px">Cuts stay on the track's beat. For TikTok/Reels: add the same track from within the app (licensed, no mute/claim).</div>
+      <div class="hint" style="margin-top:6px">Draft = 540×960, fast. Final = 1080×1920.</div>
+      <div class="status" id="renderStatus" hidden></div>
+      <div class="row" style="margin-top:8px"><a id="dl" class="hint" hidden download>⬇ Download</a></div>
+      <div class="panel">
+        <h3>Continue in DaVinci Resolve</h3>
+        <div class="hint">Editable timeline with the <b>original</b> files: order, cuts, framing, transitions (as Cross Dissolve), volume, music, texts.
+        <br><b>Not transferred:</b> color grading (redo it in the Color page), photo zoom, blurred background, text styling, ducking.
+        <br>In DaVinci: <i>File → Import → Timeline…</i> and pick the file. Don't move the project folder, or you'll need to relink the files (Relink).</div>
+        <button class="small" id="fcpBtn" style="margin-top:8px">⬇ Export .fcpxml</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = async (path, opt = {}) => {
+  const r = await fetch(path, opt);
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch {} ; throw new Error(m) }
+  return r.json();
+};
+const jsonOpt = (method, body) => ({method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+const debounce = (fn, ms) => {
+  let t = null, args = [];
+  const d = (...a) => { args = a; clearTimeout(t); t = setTimeout(() => { t = null; fn(...args) }, ms) };
+  d.flush = async () => { if (t) { clearTimeout(t); t = null; await fn(...args) } };   // run immediately if pending
+  return d;
+};
+const fmt = n => (Math.round(n * 100) / 100).toString();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function bindAdvToggle(container) {
+  const btn = container.querySelector('[data-advtoggle]');
+  if (!btn) return;
+  btn.onclick = () => {
+    container.classList.toggle('showAdv');
+    btn.textContent = container.classList.contains('showAdv') ? 'Hide advanced' : 'Show advanced';
+  };
+}
+
+let CFG, P = null, selFile = null, selClip = null;
+const PRESET_FIELDS = ['target_duration', 'pace', 'color_look', 'vertical_fit', 'photo_motion', 'transition_style', 'text_style'];
+const TR_TYPES = ['fade', 'dissolve', 'fadeblack', 'fadewhite', 'wipeleft', 'slideleft', 'slideup', 'smoothleft', 'circleopen', 'zoomin'];
+const COLOR_KEYS = [['brightness', 'Brightness', -0.3, 0.3, 0.01], ['contrast', 'Contrast', 0.5, 2, 0.01],
+                    ['saturation', 'Saturation', 0, 3, 0.01], ['warmth', 'Warmth', -0.2, 0.2, 0.01]];
+const thumb = n => `/api/projects/${P.id}/thumb/${encodeURIComponent(n)}`;
+const mediaOf = n => P.media.find(m => m.name === n);
+
+// ---------------- projects ----------------
+async function init() {
+  CFG = await api('/api/config');
+  $('#preset').innerHTML = Object.keys(CFG.presets).map(k => `<option>${k}</option>`).join('');
+  let list = await api('/api/projects');
+  if (!list.length) { await api('/api/projects', {method: 'POST'}); list = await api('/api/projects') }
+  fillProjects(list);
+  await loadProject(localStorageGet('proj') && list.find(p => p.id === localStorageGet('proj')) ? localStorageGet('proj') : list[0].id);
+}
+function localStorageGet(k) { try { return localStorage.getItem(k) } catch { return null } }
+function localStorageSet(k, v) { try { localStorage.setItem(k, v) } catch {} }
+function fillProjects(list) {
+  $('#projSel').innerHTML = list.map(p => `<option value="${p.id}">Project ${p.id} · ${p.files} files</option>`).join('');
+}
+async function loadProject(id) {
+  P = await api(`/api/projects/${id}`);
+  localStorageSet('proj', id);
+  $('#projSel').value = id;
+  selFile = null; selClip = null;
+  renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderPlan();
+  $('#player').removeAttribute('src'); $('#dl').hidden = true;
+}
+async function refresh() { P = await api(`/api/projects/${P.id}`); }
+$('#projSel').onchange = e => loadProject(e.target.value);
+$('#newProj').onclick = async () => { const r = await api('/api/projects', {method: 'POST'}); fillProjects(await api('/api/projects')); loadProject(r.id) };
+
+// ---------------- upload ----------------
+const drop = $('#drop');
+drop.onclick = () => $('#fileIn').click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over') };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); upload(e.dataTransfer.files) };
+$('#fileIn').onchange = e => upload(e.target.files);
+async function upload(files) {
+  if (!files.length) return;
+  const fd = new FormData(); [...files].forEach(f => fd.append('files', f));
+  drop.textContent = `Uploading ${files.length} file(s)…`;
+  try { await api(`/api/projects/${P.id}/upload`, {method: 'POST', body: fd}) }
+  catch (e) { alertStatus('#planStatus', e.message, true) }
+  drop.innerHTML = 'Drag videos and photos here<br><small>or click to choose</small>';
+  await refresh(); renderGrid(); renderTranscripts(); fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
+}
+$('#exBtn').onclick = () => $('#exIn').click();
+$('#exIn').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  $('#exName').textContent = 'uploading…';
+  await api(`/api/projects/${P.id}/example`, {method: 'POST', body: fd});
+  await refresh(); renderExample();
+};
+$('#exDel').onclick = async () => { await api(`/api/projects/${P.id}/example`, {method: 'DELETE'}); await refresh(); renderExample() };
+function renderExample() { $('#exName').textContent = P.example || 'none'; $('#exDel').hidden = !P.example }
+
+// ---------------- material grid ----------------
+function renderGrid() {
+  if (!P.media.length) { $('#grid').innerHTML = '<div class="empty" style="grid-column:1/3">No files yet</div>'; return }
+  $('#grid').innerHTML = P.media.map(m => {
+    const h = P.hints[m.name] || {};
+    const badges = [];
+    if (h.use === 'must') badges.push('<span class="b must">required</span>');
+    if (h.use === 'exclude') badges.push('<span class="b ex">excluded</span>');
+    if (P.transcripts[m.name]) badges.push('<span class="b">📝</span>');
+    if (h.color || (h.fit && h.fit !== 'auto') || h.segment_in != null || h.segment_out != null || h.photo_duration || (h.photo_motion && h.photo_motion !== 'auto') || h.note)
+      badges.push('<span class="b set">set</span>');
+    const orient = m.height > m.width ? '9:16' : '16:9';
+    const meta = m.kind === 'video' ? `${fmt(m.duration)}s · ${orient} · ${Math.round(m.fps)}fps${m.has_audio ? ' · 🔊' : ''}` : `photo · ${orient}`;
+    return `<div class="card ${selFile === m.name ? 'sel' : ''} ${h.use === 'exclude' ? 'excl' : ''}" data-n="${esc(m.name)}">
+      <div class="badges">${badges.join('')}</div>
+      <img src="${thumb(m.name)}" loading="lazy" alt="">
+      <div class="nm" title="${esc(m.name)}">${esc(m.name)}</div><div class="mt">${meta}</div></div>`;
+  }).join('');
+  document.querySelectorAll('.card').forEach(c => c.onclick = () => { selFile = selFile === c.dataset.n ? null : c.dataset.n; renderGrid(); renderHint() });
+}
+
+// ---------------- per-file settings ----------------
+const DEFAULT_HINT = {use: 'auto', segment_in: null, segment_out: null, fit: 'auto', color: null, photo_duration: null, photo_motion: 'auto', volume: null, note: ''};
+function renderHint() {
+  const panel = $('#hintPanel');
+  if (!selFile) { panel.hidden = true; return }
+  const m = mediaOf(selFile); if (!m) { panel.hidden = true; return }
+  const h = {...DEFAULT_HINT, ...(P.hints[selFile] || {})};
+  const segBtns = (key, opts) => `<div class="seg" data-k="${key}">${opts.map(([v, l]) => `<button data-v="${v}" class="${h[key] === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const src = `/api/projects/${P.id}/media/${encodeURIComponent(m.name)}`;
+  panel.hidden = false;
+  panel.innerHTML = `
+    <h3>File settings <span class="hint">— ${esc(m.name)}</span></h3>
+    <div class="hint" style="margin-bottom:6px">What you fix here is applied exactly; the AI takes it into account and harmonizes the rest.</div>
+    ${m.kind === 'video' ? `<video id="hv" src="${src}" controls muted preload="metadata"></video>` : `<img src="${thumb(m.name)}" style="width:100%;border-radius:6px">`}
+    <div class="field"><label>Usage</label>${segBtns('use', [['auto', 'auto'], ['must', 'required'], ['exclude', 'excluded']])}</div>
+    ${m.kind === 'video' ? `
+      <div class="field"><label>Allowed range</label>
+        <input type="number" id="h_in" step="0.1" min="0" max="${m.duration}" value="${h.segment_in ?? ''}" placeholder="0">
+        <span class="hint">–</span>
+        <input type="number" id="h_out" step="0.1" min="0" max="${m.duration}" value="${h.segment_out ?? ''}" placeholder="${fmt(m.duration)}">
+      </div>
+      <div class="row" style="margin:-2px 0 6px 100px"><button class="small" id="setIn">start = now</button><button class="small" id="setOut">end = now</button><button class="small" id="clrSeg">clear</button></div>` : `
+      <div class="field"><label>Duration (s)</label><input type="number" id="h_pd" step="0.1" min="2" max="4" value="${h.photo_duration ?? ''}" placeholder="auto"></div>
+      <div class="field"><label>Motion</label>${segBtns('photo_motion', [['auto', 'auto'], ['zoom_in', 'zoom in'], ['zoom_out', 'zoom out'], ['static', 'static']])}</div>`}
+    <div class="field"><label>Framing</label>${segBtns('fit', [['auto', 'auto'], ['crop_center', 'crop'], ['blur_pad', 'blurred']])}</div>
+    <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
+    <div class="adv">
+      ${m.has_audio ? `<div class="field"><label>Fix volume</label><input type="checkbox" id="h_vl" ${h.volume != null ? 'checked' : ''}>
+        <input type="range" id="h_vol" min="0" max="2" step="0.05" value="${h.volume ?? 1}" ${h.volume != null ? '' : 'disabled'}><span class="v">${fmt(h.volume ?? 1)}</span></div>` : ''}
+      <div class="field"><label>Fix color</label><input type="checkbox" id="h_cl" ${h.color ? 'checked' : ''}></div>
+      <div id="h_colors" ${h.color ? '' : 'hidden'}>${COLOR_KEYS.map(([k, l, mn, mx, st]) => {
+        const v = h.color ? h.color[k] : (k === 'contrast' || k === 'saturation' ? 1 : 0);
+        return `<div class="field"><label>${l}</label><input type="range" data-ck="${k}" min="${mn}" max="${mx}" step="${st}" value="${v}"><span class="v">${fmt(v)}</span></div>`
+      }).join('')}</div>
+      <div class="field" style="align-items:flex-start"><label>Note for AI</label><textarea id="h_note" placeholder="e.g. the good moment is the jump at the end">${esc(h.note)}</textarea></div>
+    </div>
+    <div class="row"><button class="small" id="h_reset">Reset</button><button class="small" id="h_del" style="color:var(--err)">Remove file</button><span class="hint" id="h_saved"></span></div>`;
+
+  const save = debounce(async () => {
+    const color = $('#h_cl').checked ? Object.fromEntries([...panel.querySelectorAll('[data-ck]')].map(i => [i.dataset.ck, +i.value])) : null;
+    const num = id => { const el = $(id); return el && el.value !== '' ? +el.value : null };
+    const hint = {
+      use: panel.querySelector('[data-k=use] .on').dataset.v,
+      fit: panel.querySelector('[data-k=fit] .on').dataset.v,
+      segment_in: num('#h_in'), segment_out: num('#h_out'),
+      photo_duration: num('#h_pd'),
+      photo_motion: panel.querySelector('[data-k=photo_motion] .on')?.dataset.v || 'auto',
+      volume: $('#h_vl')?.checked ? +$('#h_vol').value : null,
+      color, note: $('#h_note').value,
+    };
+    try {
+      await api(`/api/projects/${P.id}/hints/${encodeURIComponent(selFile)}`, jsonOpt('PUT', hint));
+      P.hints[selFile] = hint; $('#h_saved').textContent = '✓ saved'; $('#h_saved').style.color = 'var(--ok)'; renderGrid();
+    } catch (e) { $('#h_saved').textContent = e.message; $('#h_saved').style.color = 'var(--err)' }
+  }, 350);
+
+  panel.querySelectorAll('.seg button').forEach(b => b.onclick = () => { b.parentNode.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); save() });
+  panel.querySelectorAll('input,textarea').forEach(i => i.addEventListener('input', () => {
+    if (i.dataset.ck) i.nextElementSibling.textContent = fmt(+i.value);
+    if (i.id === 'h_cl') $('#h_colors').hidden = !i.checked;
+    if (i.id === 'h_vl') $('#h_vol').disabled = !i.checked;
+    if (i.id === 'h_vol') i.nextElementSibling.textContent = fmt(+i.value);
+    save();
+  }));
+  bindAdvToggle(panel);
+  const hv = $('#hv');
+  if (hv) {
+    $('#setIn').onclick = () => { $('#h_in').value = fmt(hv.currentTime); save() };
+    $('#setOut').onclick = () => { $('#h_out').value = fmt(hv.currentTime); save() };
+    $('#clrSeg').onclick = () => { $('#h_in').value = ''; $('#h_out').value = ''; save() };
+  }
+  $('#h_reset').onclick = async () => { await api(`/api/projects/${P.id}/hints/${encodeURIComponent(selFile)}`, jsonOpt('PUT', DEFAULT_HINT)); delete P.hints[selFile]; renderGrid(); renderHint() };
+  $('#h_del').onclick = async () => { await api(`/api/projects/${P.id}/media/${encodeURIComponent(selFile)}`, {method: 'DELETE'}); selFile = null; await refresh(); renderGrid(); renderHint() };
+}
+
+// ---------------- transcription (Whisper) ----------------
+function renderTranscripts() {
+  const panel = $('#trPanel');
+  const withAudio = P.media.filter(m => m.kind === 'video' && m.has_audio);
+  if (!withAudio.length) { panel.hidden = true; return }
+  panel.hidden = false;
+  const missing = withAudio.filter(m => !P.transcripts[m.name]).length;
+  panel.innerHTML = `
+    <h3>Speech transcription <span class="hint">(Whisper · model ${esc(P.whisper.model)})</span></h3>
+    ${P.whisper.available ? '' : `<div class="status err" style="margin:4px 0 8px">${esc(P.whisper.message)}</div>`}
+    ${withAudio.map(m => { const t = P.transcripts[m.name]; return `<div class="hint" style="margin:6px 0">
+      <b style="color:var(--text)">${esc(m.name)}</b> ${t ? `· ${esc(t.language || '?')} <button class="small" data-trdel="${esc(m.name)}">redo</button><br><i>"${esc(t.text || '(no speech)')}"</i>` : '· not transcribed'}</div>` }).join('')}
+    <div class="row" style="margin-top:6px"><button class="small" id="trBtn" ${P.whisper.available && missing ? '' : 'disabled'}>📝 Transcribe ${missing} clip(s)</button>
+    <span class="hint">the first run downloads the model (~460MB)</span></div>
+    <div class="status" id="trStatus" hidden></div>`;
+  $('#trBtn').onclick = async () => {
+    $('#trBtn').disabled = true;
+    try {
+      const {job} = await api(`/api/projects/${P.id}/transcribe`, {method: 'POST'});
+      await waitJob(job, '#trStatus', 'Whisper is listening');
+      await refresh(); renderTranscripts(); renderGrid(); renderPlan();
+    } catch (e) { alertStatus('#trStatus', e.message, true); $('#trBtn').disabled = false }
+  };
+  panel.querySelectorAll('[data-trdel]').forEach(b => b.onclick = async () => {
+    await api(`/api/projects/${P.id}/transcripts/${encodeURIComponent(b.dataset.trdel)}`, {method: 'DELETE'});
+    await refresh(); renderTranscripts(); renderGrid(); renderPlan();
+  });
+}
+
+// ---------------- music ----------------
+$('#muBtn').onclick = () => $('#muIn').click();
+$('#muIn').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  $('#muName').textContent = 'analyzing…';
+  try { const r = await api(`/api/projects/${P.id}/music`, {method: 'POST', body: fd}); P.music = r.music }
+  catch (err) { $('#muName').textContent = err.message; return }
+  renderMusic(); renderPlan();
+};
+$('#muDel').onclick = async () => { await api(`/api/projects/${P.id}/music`, {method: 'DELETE'}); P.music = null; renderMusic(); renderPlan() };
+function renderMusic() {
+  const m = P.music, body = $('#muBody');
+  $('#muteRow').hidden = $('#muteHint').hidden = !m;
+  $('#muDel').hidden = !m;
+  if (!m) { $('#muName').textContent = 'no track'; body.hidden = true; return }
+  $('#muName').innerHTML = `<b style="color:var(--text)">${esc(m.file)}</b> · ${m.bpm} BPM · ${fmt(m.duration)}s`;
+  body.hidden = false;
+  const target = +$('#f_target_duration').value;
+  const slider = (k, l, mn, mx, st) => `<div class="field"><label>${l}</label><input type="range" data-mk="${k}" min="${mn}" max="${mx}" step="${st}" value="${m[k]}"><span class="v">${fmt(m[k])}</span></div>`;
+  const avail = m.duration - m.start;
+  body.innerHTML = `
+    <audio id="mu" src="/api/projects/${P.id}/music/file" controls preload="metadata"></audio>
+    <div class="energy" id="muEnergy" title="Track energy per second — click to set the start point">${m.energy.map((e, i) =>
+      `<div data-s="${i}" class="${i >= m.start && i < m.start + target ? 'in' : ''}" style="height:${Math.max(4, e * 100)}%"></div>`).join('')}</div>
+    <div class="hint">orange = the section of the track that goes into the video (${target}s)${avail < target ? ` · <span style="color:var(--warn)">the track only has ${fmt(avail)}s left</span>` : ''}</div>
+    <div class="field"><label>Start in track</label><input type="number" data-mk="start" step="0.1" min="0" max="${m.duration}" value="${m.start}"><button class="small" id="muNow">= now</button></div>
+    ${slider('volume', 'Volume', 0, 2, 0.05)}
+    <div class="field"><label>On beat</label><input type="checkbox" data-mk="beat_sync" ${m.beat_sync ? 'checked' : ''}><span class="hint">cuts automatically align to the beat</span></div>
+    <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
+    <div class="adv">
+      ${slider('fade_in', 'Fade in (s)', 0, 5, 0.1)}
+      ${slider('fade_out', 'Fade out (s)', 0, 5, 0.1)}
+      ${P.media.some(x => x.has_audio) ? `<div class="field"><label>Ducking</label><input type="checkbox" data-mk="duck" ${m.duck !== false ? 'checked' : ''}><span class="hint">music ducks when clip audio is audible</span></div>` : ''}
+    </div>
+    <span class="hint" id="muSaved"></span>`;
+  const save = debounce(async () => {
+    const v = k => body.querySelector(`[data-mk=${k}]`);
+    const settings = {start: +v('start').value, volume: +v('volume').value, fade_in: +v('fade_in').value,
+                      fade_out: +v('fade_out').value, beat_sync: v('beat_sync').checked,
+                      duck: v('duck') ? v('duck').checked : true};
+    try {
+      const r = await api(`/api/projects/${P.id}/music`, jsonOpt('PUT', settings));
+      const startChanged = r.music.start !== P.music.start;
+      P.music = r.music;
+      if (r.resnapped) { await refresh(); renderPlan() }
+      if (startChanged) renderMusic();
+      $('#muSaved').textContent = r.resnapped ? '✓ saved · cuts realigned to the beat' : '✓ saved';
+      $('#muSaved').style.color = 'var(--ok)';
+    } catch (e) { $('#muSaved').textContent = e.message; $('#muSaved').style.color = 'var(--err)' }
+  }, 450);
+  body.querySelectorAll('[data-mk]').forEach(i => i.addEventListener(i.type === 'number' ? 'change' : 'input', () => {
+    if (i.type === 'range') i.nextElementSibling.textContent = fmt(+i.value);
+    save();
+  }));
+  bindAdvToggle(body);
+  $('#muNow').onclick = () => { body.querySelector('[data-mk=start]').value = fmt($('#mu').currentTime); save() };
+  $('#muEnergy').onclick = e => { const s = e.target.dataset.s; if (s != null) { body.querySelector('[data-mk=start]').value = s; save() } };
+}
+
+// ---------------- preset + fields ----------------
+function renderSettings() {
+  $('#preset').value = P.preset;
+  const base = CFG.presets[P.preset];
+  PRESET_FIELDS.forEach(k => { $('#f_' + k).value = String(P.overrides[k] ?? base[k]); markOverride(k) });
+  $('#f_notes').value = P.overrides.notes ?? base.notes ?? '';
+}
+function markOverride(k) {
+  const el = $('#f_' + k); const base = CFG.presets[$('#preset').value];
+  el.style.borderColor = String(base[k]) !== el.value ? 'var(--acc)' : '';
+}
+const saveSettings = debounce(async () => {
+  const preset = $('#preset').value, base = CFG.presets[preset], overrides = {};
+  PRESET_FIELDS.forEach(k => { const v = $('#f_' + k).value; if (String(base[k]) !== v) overrides[k] = k === 'target_duration' ? +v : v; markOverride(k) });
+  if ($('#f_notes').value.trim()) overrides.notes = $('#f_notes').value.trim();
+  P.preset = preset; P.overrides = overrides;
+  await api(`/api/projects/${P.id}/settings`, jsonOpt('PUT', {preset, overrides}));
+}, 300);
+$('#preset').onchange = () => { P.preset = $('#preset').value; P.overrides = {}; renderSettings(); saveSettings(); renderMusic(); renderPlan() };
+PRESET_FIELDS.concat('notes').forEach(k => $('#f_' + k).addEventListener('input', saveSettings));
+$('#f_target_duration').addEventListener('input', () => { renderMusic(); renderPlan() });
+
+// ---------------- jobs ----------------
+async function waitJob(jid, statusSel, label) {
+  const t0 = Date.now();
+  while (true) {
+    const j = await api(`/api/jobs/${jid}`);
+    if (j.status === 'done') return j.result;
+    if (j.status === 'error') throw new Error(j.error);
+    alertStatus(statusSel, `${label}… ${Math.round((Date.now() - t0) / 1000)}s`);
+    await new Promise(r => setTimeout(r, 1000));
+  }
+}
+function alertStatus(sel, msg, err = false, ok = false) { const s = $(sel); s.hidden = false; s.textContent = msg; s.className = 'status' + (err ? ' err' : ok ? ' ok' : '') }
+
+$('#planBtn').onclick = async () => {
+  $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = true;
+  $('#planStatus').className = 'status';
+  await saveSettings.flush();
+  await saveEdl.flush();   // timeline edits must be saved before the AI reads the locked items
+  try {
+    const {job} = await api(`/api/projects/${P.id}/plan`, {method: 'POST'});
+    const r = await waitJob(job, '#planStatus', 'The AI is analyzing the frames');
+    await refresh(); selClip = null; renderPlan();
+    alertStatus('#planStatus', `Plan ready: ${P.edl.clips.length} clips, ${fmt(r.total)}s`, false, true);
+  } catch (e) { alertStatus('#planStatus', e.message, true) }
+  $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = false;
+};
+
+// ---------------- plan / timeline ----------------
+function updatePlanBtn() {
+  const locked = P.edl ? P.edl.clips.filter(c => c.locked).length : 0;
+  $('#planBtn').textContent = P.edl ? (locked ? `Regenerate (keep ${locked} 🔒)` : 'Regenerate plan') : 'Generate plan';
+  $('#planHint').textContent = P.edl ? 'Lock 🔒 the good cuts — the AI only redoes the rest.' : '';
+}
+const clipDur = c => c.in != null ? c.out - c.in : (c.duration || 2.5);
+function renderPlan() {
+  const area = $('#planArea');
+  updatePlanBtn();
+  $('#usage').textContent = P.usage ? `last plan: ${P.usage.input_tokens} tok in / ${P.usage.output_tokens} out` : '';
+  if (!P.edl) { area.innerHTML = '<div class="empty">Upload your material, choose a preset, and click "Generate plan".</div>'; return }
+  const clips = P.edl.clips, total = clips.reduce((s, c) => s + clipDur(c), 0);
+  const target = +$('#f_target_duration').value;
+  const off = Math.abs(total - target) > target * 0.1;
+  area.innerHTML = `
+    ${P.reasoning ? `<div class="reason">${esc(P.reasoning)}</div>` : ''}
+    <div class="row"><b>Timeline</b><span class="total ${off ? 'off' : ''}">${fmt(total)}s / target ${target}s</span><span class="hint" id="edlMsg"></span></div>
+    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}"><span>${c.locked ? '🔒' : i + 1}</span></div>`).join('')}</div>${beatTicks(total)}</div>
+    ${textTrack(total)}
+    ${clips.map((c, i) => clipRow(c, i)).join('')}
+    ${Object.keys(P.transcripts || {}).length ? `<label class="row hint" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="subChk" ${P.subtitles ? 'checked' : ''}>
+      Automatic subtitles from the transcript <span>(${(P.subtitles_preview || []).length} on the current timeline · recalculated on every render)</span></label>` : ''}
+    <div class="row" style="margin:16px 0 8px"><b>On-screen text</b><span class="hint">times are on the final video · editing locks the text 🔒</span><div style="flex:1"></div><button class="small" id="addText">+ Add text</button></div>
+    ${(P.edl.texts || []).length ? P.edl.texts.map((t, k) => textRow(t, k, total)).join('') : '<div class="hint">No text yet. Choose a text style in the preset, or add one manually.</div>'}`;
+  area.querySelectorAll('.tl div').forEach(d => d.onclick = () => { selClip = selClip === +d.dataset.i ? null : +d.dataset.i; renderPlan(); area.querySelector(`.clip[data-i="${d.dataset.i}"]`)?.scrollIntoView({block: 'nearest'}) });
+  bindClips(area);
+  bindTexts(area, total);
+  const sc = $('#subChk');
+  if (sc) sc.onchange = async () => { P.subtitles = sc.checked; await api(`/api/projects/${P.id}/settings`, jsonOpt('PUT', {preset: P.preset, overrides: P.overrides, subtitles: sc.checked})); await refresh(); renderPlan() };
+}
+const STYLE_LABELS = {title: 'title', caption: 'caption', cta: 'call-to-action'};
+const POS_LABELS = {top: 'top', center: 'center', bottom: 'bottom'};
+function textTrack(total) {
+  const tx = P.edl.texts || [], sb = P.subtitles ? (P.subtitles_preview || []) : [];
+  if ((!tx.length && !sb.length) || !total) return '';
+  return `<div class="trk">${sb.map(t => `<div class="subtitle" style="left:${t.start / total * 100}%;width:${(t.end - t.start) / total * 100}%" title="subtitle: ${esc(t.content)}"></div>`).join('')}${tx.map((t, k) => `<div data-k="${k}" class="${t.style} ${t.locked ? 'locked' : ''}" style="left:${t.start / total * 100}%;width:${(t.end - t.start) / total * 100}%" title="${esc(t.content)}">${esc(t.content)}</div>`).join('')}</div>`;
+}
+function textRow(t, k, total) {
+  const opt = (obj, v) => Object.entries(obj).map(([a, b]) => `<option value="${a}" ${a === v ? 'selected' : ''}>${b}</option>`).join('');
+  return `<div class="txt ${t.locked ? 'locked' : ''}" data-k="${k}">
+    <input type="text" data-t="content" maxlength="80" value="${esc(t.content)}">
+    <div class="row" style="gap:4px"><button class="small lockbtn ${t.locked ? 'on' : ''}" data-ta="lock">${t.locked ? '🔒 Locked' : 'Lock'}</button><button class="small" data-ta="del">✕</button></div>
+    <div class="row" style="grid-column:1/3">
+      <span class="hint">from</span><input type="number" data-t="start" step="0.1" min="0" max="${fmt(total)}" value="${t.start}">
+      <span class="hint">to</span><input type="number" data-t="end" step="0.1" min="0" max="${fmt(total)}" value="${t.end}">
+      <select data-t="style">${opt(STYLE_LABELS, t.style)}</select>
+      <select data-t="position">${opt(POS_LABELS, t.position)}</select>
+      <button class="small" data-ta="now" title="starts at the current second in the preview">▶ = now</button>
+    </div></div>`;
+}
+function bindTexts(area, total) {
+  const tx = P.edl.texts = P.edl.texts || [];
+  $('#addText').onclick = () => {
+    const st = Math.min(Math.max(0, $('#player').currentTime || 0), Math.max(0, total - 2.5));
+    const item = {content: 'New text', start: +fmt(st), end: +fmt(Math.min(total, st + 2.5)), position: 'bottom', style: 'caption', locked: true};
+    tx.push(item); tx.sort((a, b) => a.start - b.start); saveEdl(); renderPlan();
+    const inp = $(`.txt[data-k="${tx.indexOf(item)}"] input[type=text]`);
+    if (inp) { inp.scrollIntoView({block: 'center'}); inp.select() }
+  };
+  area.querySelectorAll('.trk div').forEach(d => d.onclick = () => area.querySelector(`.txt[data-k="${d.dataset.k}"] input`)?.focus());
+  area.querySelectorAll('.txt').forEach(row => {
+    const k = +row.dataset.k;
+    row.querySelectorAll('[data-ta]').forEach(b => b.onclick = () => {
+      if (b.dataset.ta === 'lock') tx[k].locked = !tx[k].locked;
+      if (b.dataset.ta === 'del') tx.splice(k, 1);
+      if (b.dataset.ta === 'now') { const d = tx[k].end - tx[k].start; tx[k].start = +fmt($('#player').currentTime || 0); tx[k].end = +fmt(Math.min(total, tx[k].start + d)); tx[k].locked = true }
+      saveEdl(); renderPlan();
+    });
+    row.querySelectorAll('[data-t]').forEach(inp => inp.addEventListener('change', () => {
+      const f = inp.dataset.t;
+      tx[k][f] = inp.type === 'number' ? +inp.value : inp.value;
+      tx[k].locked = true;
+      if (f === 'start') tx.sort((a, b) => a.start - b.start);
+      saveEdl(); renderPlan();
+    }));
+  });
+}
+function beatTicks(total) {
+  const m = P.music; if (!m || !m.beat_sync || !total) return '';
+  const rel = m.beats.map(b => b - m.start).filter(t => t > 0 && t < total);
+  return `<div class="ticks">${rel.map((t, k) => `<i class="${k % 4 === 3 ? 'bar' : ''}" style="left:${t / total * 100}%"></i>`).join('')}</div>`;
+}
+function clipRow(c, i) {
+  const m = mediaOf(c.source) || {};
+  const open = selClip === i;
+  const timing = c.in != null
+    ? `<div class="field"><label>Start / end</label><input type="number" data-f="in" step="0.1" min="0" max="${m.duration}" value="${c.in}"><input type="number" data-f="out" step="0.1" min="0" max="${m.duration}" value="${c.out}"><span class="hint">/ ${fmt(m.duration || 0)}s</span></div>`
+    : `<div class="field"><label>Duration</label><input type="number" data-f="duration" step="0.1" min="2" max="4" value="${c.duration}"></div>
+       <div class="field"><label>Motion</label><select data-f="motion">${['zoom_in', 'zoom_out', 'static'].map(v => `<option ${c.motion === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
+  return `<div class="clip ${open ? 'sel' : ''} ${c.locked ? 'locked' : ''}" data-i="${i}">
+    <div class="ix">${i + 1}</div>
+    <img src="${thumb(c.source)}" alt="">
+    <div><div class="src" title="${esc(c.source)}">${esc(c.source)}</div>
+      <div class="hint">${c.in != null ? `${fmt(c.in)}–${fmt(c.out)}s` : 'photo'} · ${fmt(clipDur(c))}s · ${c.fit === 'blur_pad' ? 'blurred' : 'crop'}</div>
+      <div class="hint">L ${fmt(c.brightness)} · C ${fmt(c.contrast)} · S ${fmt(c.saturation)} · K ${fmt(c.warmth)}</div>
+      ${m.has_audio ? `<div class="hint">🔊 sound ${(c.volume ?? 1) > 0 ? fmt((c.volume ?? 1) * 100) + '%' : 'off'}</div>` : ''}
+      ${i > 0 ? `<div class="trb">${c.transition_in ? `↘ enters with ${c.transition_in.type} ${fmt(c.transition_in.duration)}s` : '| direct cut'}</div>` : ''}</div>
+    <div class="ctrl">
+      <button class="small lockbtn ${c.locked ? 'on' : ''}" data-a="lock" title="Locked = the AI won't change it on regenerate">${c.locked ? '🔒 Locked' : 'Lock'}</button>
+      <div class="row" style="gap:3px"><button class="small" data-a="up" ${i === 0 ? 'disabled' : ''}>↑</button><button class="small" data-a="down" ${i === P.edl.clips.length - 1 ? 'disabled' : ''}>↓</button></div>
+      <button class="small" data-a="edit">${open ? 'Close' : 'Edit'}</button>
+      <button class="small" data-a="del" title="Delete">✕</button>
+    </div>
+    ${open ? `<div class="det">${timing}
+      ${i > 0 ? `<div class="field"><label>Transition</label><select data-f="tr_type"><option value="">direct cut</option>${TR_TYPES.map(t => `<option ${c.transition_in?.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        <input type="number" data-f="tr_dur" step="0.05" min="0.15" max="1" value="${c.transition_in?.duration ?? 0.4}" ${c.transition_in ? '' : 'disabled'}><span class="hint">s</span></div>` : ''}
+      <div class="field"><label>Framing</label><select data-f="fit"><option value="crop_center" ${c.fit === 'crop_center' ? 'selected' : ''}>center crop</option><option value="blur_pad" ${c.fit === 'blur_pad' ? 'selected' : ''}>blurred background</option></select></div>
+      <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
+      <div class="adv">
+        ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field"><label>${l}</label><input type="range" data-f="${k}" min="${mn}" max="${mx}" step="${st}" value="${c[k]}"><span class="v">${fmt(c[k])}</span></div>`).join('')}
+        ${m.has_audio ? `<div class="field"><label>🔊 Original sound</label><input type="range" data-f="volume" min="0" max="2" step="0.05" value="${c.volume ?? 1}"><span class="v">${fmt(c.volume ?? 1)}</span></div>` : ''}
+      </div>
+      <div class="hint">A manual change automatically locks the clip 🔒.</div></div>` : ''}
+  </div>`;
+}
+const saveEdl = debounce(async () => {
+  try {
+    await api(`/api/projects/${P.id}/edl`, jsonOpt('PUT', P.edl));
+    if (Object.keys(P.transcripts || {}).length) { const np = await api(`/api/projects/${P.id}`); P.subtitles_preview = np.subtitles_preview; const tr = document.querySelector('.trk'); if (tr) tr.outerHTML = textTrack(P.edl.clips.reduce((s, c) => s + clipDur(c), 0)) }
+    $('#edlMsg').textContent = '✓ saved'; $('#edlMsg').style.color = 'var(--ok)';
+  }
+  catch (e) { $('#edlMsg').textContent = e.message; $('#edlMsg').style.color = 'var(--err)' }
+}, 400);
+function bindClips(area) {
+  area.querySelectorAll('.clip').forEach(row => {
+    const i = +row.dataset.i, clips = P.edl.clips;
+    bindAdvToggle(row);
+    row.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+      const a = b.dataset.a;
+      if (a === 'lock') clips[i].locked = !clips[i].locked;
+      if (a === 'edit') selClip = selClip === i ? null : i;
+      if (a === 'del') { clips.splice(i, 1); selClip = null }
+      if (a === 'up' || a === 'down') { const j = a === 'up' ? i - 1 : i + 1; [clips[i], clips[j]] = [clips[j], clips[i]]; selClip = selClip === i ? j : selClip }
+      if (a !== 'edit') saveEdl();
+      renderPlan();
+    });
+    row.querySelectorAll('[data-f]').forEach(inp => inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
+      const f = inp.dataset.f, c = clips[i];
+      if (f === 'tr_type') c.transition_in = inp.value ? {type: inp.value, duration: c.transition_in?.duration ?? 0.4} : null;
+      else if (f === 'tr_dur') { if (c.transition_in) c.transition_in.duration = +inp.value }
+      else c[f] = inp.tagName === 'SELECT' ? inp.value : +inp.value;
+      c.locked = true;
+      if (inp.type === 'range') { inp.nextElementSibling.textContent = fmt(+inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
+      else { saveEdl(); renderPlan() }
+    }));
+  });
+}
+
+// ---------------- render ----------------
+async function doRender(final) {
+  if (!P.edl) return alertStatus('#renderStatus', 'Generate a plan first', true);
+  $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = true;
+  $('#renderStatus').className = 'status';
+  try {
+    await saveEdl.flush();
+    const mute = !!P.music && $('#muteChk').checked;
+    const {job} = await api(`/api/projects/${P.id}/render?final=${final}&mute=${mute}`, {method: 'POST'});
+    const r = await waitJob(job, '#renderStatus', final ? 'Rendering final' : 'Rendering draft');
+    $('#player').src = r.url; $('#player').play().catch(() => {});
+    $('#dl').href = r.url; $('#dl').hidden = false; $('#dl').download = r.file; $('#dl').textContent = `⬇ Download ${r.file}`;
+    alertStatus('#renderStatus', `Done in ${r.seconds}s`, false, true);
+  } catch (e) { alertStatus('#renderStatus', e.message, true) }
+  $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = false;
+}
+$('#fcpBtn').onclick = async () => {
+  if (!P.edl) return alertStatus('#renderStatus', 'Generate a plan first', true);
+  await saveEdl.flush();
+  const a = document.createElement('a'); a.href = `/api/projects/${P.id}/export/fcpxml`; a.download = ''; a.click();
+};
+$('#draftBtn').onclick = () => doRender(false);
+$('#finalBtn').onclick = () => doRender(true);
+
+init().catch(e => alertStatus('#planStatus', 'The server is not responding: ' + e.message, true));
+</script>
+</body>
+</html>

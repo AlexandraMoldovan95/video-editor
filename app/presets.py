@@ -1,0 +1,80 @@
+"""Presets with fixed fields + translating them into concrete values for the AI/render."""
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+Pace = Literal["slow", "medium", "fast"]
+ColorLook = Literal["neutral", "warm", "cool", "contrast", "pastel"]
+
+
+class Preset(BaseModel):
+    target_duration: Literal[15, 30, 45, 60] = 30
+    pace: Pace = "medium"
+    color_look: ColorLook = "neutral"
+    vertical_fit: Literal["crop_center", "blur_pad"] = "crop_center"
+    photo_motion: Literal["zoom_in", "zoom_out", "static"] = "zoom_in"
+    transition_style: Literal["cuts", "subtle", "dynamic"] = "cuts"
+    text_style: Literal["none", "title_only", "story"] = "none"
+    notes: str = Field("", max_length=500)
+
+
+PRESETS: dict[str, Preset] = {
+    "neutral": Preset(),
+    "reel_energetic": Preset(target_duration=15, pace="fast", color_look="contrast",
+                             transition_style="dynamic", text_style="title_only"),
+    "vlog_calm": Preset(target_duration=45, pace="slow", color_look="warm", vertical_fit="blur_pad",
+                        transition_style="subtle", text_style="story"),
+    "travel_cinematic": Preset(target_duration=30, pace="medium", color_look="cool", vertical_fit="blur_pad",
+                               transition_style="subtle", text_style="title_only"),
+}
+
+# length of a cut, in seconds (min, max)
+PACE_RANGE: dict[str, tuple[float, float]] = {
+    "slow": (3.0, 5.0),
+    "medium": (2.0, 3.0),
+    "fast": (0.8, 1.5),
+}
+
+# starting values; the AI can adjust per clip around them
+COLOR_BASE: dict[str, dict[str, float]] = {
+    "neutral":  {"brightness": 0.0,  "contrast": 1.0,  "saturation": 1.0,  "warmth": 0.0},
+    "warm":     {"brightness": 0.02, "contrast": 1.05, "saturation": 1.1,  "warmth": 0.08},
+    "cool":     {"brightness": 0.0,  "contrast": 1.08, "saturation": 0.95, "warmth": -0.08},
+    "contrast": {"brightness": 0.0,  "contrast": 1.2,  "saturation": 1.15, "warmth": 0.0},
+    "pastel":   {"brightness": 0.05, "contrast": 0.9,  "saturation": 0.8,  "warmth": 0.03},
+}
+
+
+def resolve(preset_name: str, overrides: dict | None = None,
+            measured_pace: tuple[float, float] | None = None) -> tuple[Preset, tuple[float, float]]:
+    """Priority: field set by the user > preset > rhythm measured from the example (pace only).
+
+    Returns the final preset + the cut-length range.
+    """
+    if preset_name not in PRESETS:
+        raise ValueError(f"unknown preset: {preset_name}. Available: {', '.join(PRESETS)}")
+    overrides = {k: v for k, v in (overrides or {}).items() if v not in (None, "")}
+    final = PRESETS[preset_name].model_copy(update=overrides)
+    final = Preset.model_validate(final.model_dump())  # re-validate the overrides
+    if measured_pace and "pace" not in overrides:
+        cut_range = measured_pace
+    else:
+        cut_range = PACE_RANGE[final.pace]
+    return final, cut_range
+
+
+TRANSITION_RULES = {
+    "cuts": "ONLY direct cuts: do NOT set transition_in on any clip.",
+    "subtle": ("Subtle transitions (fade, dissolve, fadeblack), 0.3-0.6s, on at most 1/3 of the boundaries - "
+               "the rest direct cuts. Use them for mood changes, not between similar clips."),
+    "dynamic": ("Dynamic transitions (slideleft, slideup, wipeleft, smoothleft, circleopen, zoomin, fadewhite), "
+                "0.2-0.4s, on at most half of the boundaries; vary the types, don't repeat the same one twice in a row."),
+}
+TEXT_RULES = {
+    "none": "Do NOT add any text (texts = []).",
+    "title_only": ("One short TITLE (max 6 words) in the first 3 seconds, style=title, position=center. "
+                   "If the user's notes ask for a call-to-action, add it at the end with style=cta."),
+    "story": ("A title at the start (style=title) + 2-4 short texts (max 8 words, style=caption, "
+              "position=bottom) that tell the story, synced with the clips they refer to; "
+              "each text stays on screen 2-4s; they don't overlap in time."),
+}

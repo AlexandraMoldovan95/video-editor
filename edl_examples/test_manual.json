@@ -1,0 +1,14 @@
+{
+  "output": { "width": 1080, "height": 1920, "fps": 30 },
+  "clips": [
+    { "source": "16931601_1080_1920_120fps.mp4", "in": 0.5, "out": 3.0, "fit": "crop_center", "brightness": 0.03, "contrast": 1.08, "saturation": 1.15 },
+    { "source": "12772832_1080_1920_30fps.mp4", "in": 2.0, "out": 5.0, "fit": "crop_center", "brightness": 0.0, "contrast": 1.05, "saturation": 1.1 },
+    { "source": "pexels-santesson89-37765467.jpg", "duration": 2.5, "motion": "zoom_in", "fit": "blur_pad" },
+    { "source": "16581829_1440_2560_60fps.mp4", "in": 1.0, "out": 4.0, "fit": "crop_center", "contrast": 1.1 },
+    { "source": "17198558_3840_2160_30fps.mp4", "in": 3.0, "out": 6.5, "fit": "blur_pad", "saturation": 1.2 },
+    { "source": "16615054_2160_3840_25fps.mp4", "in": 0.0, "out": 3.0, "fit": "crop_center" },
+    { "source": "pexels-hayriyenur-351892318-39457179.jpg", "duration": 2.5, "motion": "zoom_out", "fit": "blur_pad" },
+    { "source": "16928481_1080_1920_50fps.mp4", "in": 5.0, "out": 8.0, "fit": "crop_center", "brightness": -0.02 },
+    { "source": "15940078_2160_3840_30fps.mp4", "in": 4.0, "out": 7.5, "fit": "crop_center", "contrast": 1.1, "saturation": 1.1 }
+  ]
+}

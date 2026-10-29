@@ -1,0 +1,18 @@
+.env
+output/
+_to_delete/
+__pycache__/
+*.mp4
+*.jpg
+*.png
+projects/
+
+# internal dev notes / original brief - not part of the public project
+CLAUDE.md
+Propunere_26.10.docx
+*.mp3
+material_test/
+edl_examples/*_DELETE*
+.gitignore_write_test_DELETE
+*_stale_DELETE/
+*_stale_DELETE
