@@ -108,6 +108,10 @@ The model downloads on first use (~460 MB, `small`). A smaller model is availabl
 
 **To try the 3 demo plans without an API key**, upload a project with these exact Pexels sample filenames (any free Pexels clips/photos renamed to match work — see `app/demo_presets.py` for the full list): `16928481_1080_1920_50fps.mp4`, `16581829_1440_2560_60fps.mp4`, `15940078_2160_3840_30fps.mp4`, `16615054_2160_3840_25fps.mp4`, `16931601_1080_1920_120fps.mp4`, `17198558_3840_2160_30fps.mp4`, `12772832_1080_1920_30fps.mp4`, plus 3 photos (`pexels-ayse-ela-dikye-49914919-16268987.jpg`, `pexels-hayriyenur-351892318-39457179.jpg`, `pexels-santesson89-37765467.jpg`). The demo buttons on a project missing any of those stay disabled with a tooltip naming what's missing.
 
+## Browser demo (no install)
+
+`site/` holds a static, backend-free recreation of the interface — the same ten sample files, the same three edit plans and reasoning as the "Try a demo" buttons above, and a real ffmpeg-rendered draft video — for anyone who wants to see the UI without installing Python, ffmpeg, or getting an API key. Open [site/index.html](site/index.html) locally, or see it hosted live (link once deployed). It's a plain static page: no build step, nothing it calls back to this app.
+
 ## Known limitations (honest)
 
 - **The AI only sees 4 frames per clip.** It picks well on calm footage but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.

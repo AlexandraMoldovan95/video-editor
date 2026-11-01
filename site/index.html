@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en" style="scroll-behavior:smooth;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Editor — Alexandra Moldovan</title>
+<meta name="description" content="A local web app that turns raw clips and photos into an AI-edited vertical video for social media - the AI proposes the cut, the code validates and renders it with ffmpeg. Try the browser demo.">
+<style>
+  /* Theme: the real app's own dark palette (from the app's static/index.html), not the portfolio's theme. */
+  :root{
+    --bg:#0f1115;--panel:#171a21;--panel2:#1e222b;--line:#2a2f3a;--text:#e7e9ee;--muted:#8a91a0;
+    --acc:#ff7a45;--acc2:#ffb38f;--ok:#3ecf8e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;
+  }
+  a{color:var(--acc);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  h1,h2,h3{font-weight:650;letter-spacing:-.01em;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px;}
+
+  /* nav */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel);
+    position:sticky;top:0;z-index:10;
+  }
+  .topbar-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;max-width:1040px;margin:0 auto;width:100%;}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:650;font-size:15px;color:var(--text);}
+  .brand span{color:var(--acc);}
+  .brand .tag{
+    font-size:10.5px;font-weight:650;letter-spacing:.04em;color:#1a0d06;background:var(--acc);
+    border-radius:4px;padding:2px 7px;text-transform:uppercase;
+  }
+  .nav-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+  .nav-links a{color:var(--muted);font-size:13.5px;}
+  .nav-links a:hover{color:var(--text);text-decoration:none;}
+
+  /* hero */
+  .hero{padding:52px 0 36px;}
+  .eyebrow{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+  .hero h1{font-size:34px;margin:0 0 14px;}
+  .hero .pitch{font-size:16px;color:var(--muted);line-height:1.6;max-width:680px;margin:0 0 24px;}
+  .hero .pitch strong{color:var(--text);}
+  .cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;}
+  .btn{display:inline-block;border-radius:8px;padding:10px 18px;font-size:14px;border:1px solid var(--line);color:var(--text);}
+  .btn:hover{text-decoration:none;border-color:var(--muted);}
+  .btn-accent{background:var(--acc);color:#1a0d06;border-color:var(--acc);font-weight:650;}
+  .btn-accent:hover{border-color:var(--acc);opacity:.92;}
+  .stats-row{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:30px;}
+  .stat b{display:block;font-size:22px;color:var(--text);}
+  .stat span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;max-width:160px;}
+  .hero-media{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 20px 50px -20px rgba(0,0,0,.6);}
+  .hero-media img{width:100%;display:block;}
+
+  section{padding:40px 0;border-top:1px solid var(--line);}
+  .section-head{margin-bottom:22px;}
+  .section-head h2{font-size:22px;margin:0 0 6px;}
+  .section-head p{color:var(--muted);font-size:14px;line-height:1.6;max-width:680px;margin:0;}
+
+  /* demo */
+  .demo-banner{
+    background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:14px 18px;margin-bottom:22px;font-size:13px;color:var(--muted);line-height:1.6;
+  }
+  .demo-banner strong{color:var(--text);}
+  .demo-banner a{color:var(--acc2);}
+  .shell{
+    background:var(--panel);border-radius:12px;overflow:hidden;
+    border:1px solid var(--line);box-shadow:0 20px 50px -20px rgba(0,0,0,.6);
+    font-size:14px;
+  }
+  .shell-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel2);}
+  .shell-header h3{font-size:15px;margin:0;font-weight:650;}
+  .shell-header h3 span{color:var(--acc);}
+  .shell-header .count{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:2px 8px;margin-left:auto;}
+  .demo-grid{display:grid;grid-template-columns:260px 1fr 260px;gap:1px;background:var(--line);}
+  @media (max-width:980px){.demo-grid{grid-template-columns:1fr;}}
+  .demo-col{background:var(--bg);padding:16px;overflow:auto;}
+  .demo-col h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0 0 10px;font-weight:650;}
+  .thumb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .thumb-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .thumb-card img{width:100%;height:84px;object-fit:cover;display:block;background:#000;}
+  .thumb-card .nm{font-size:10.5px;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .thumb-card .mt{font-size:10px;color:var(--muted);padding:0 6px 5px;}
+  .preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .preset-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;
+    padding:6px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;}
+  .preset-btn:hover{border-color:var(--muted);}
+  .preset-btn.active{background:var(--acc);border-color:var(--acc);color:#1a0d06;font-weight:650;}
+  .chip-row2{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .vchip{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+    border-radius:5px;padding:3px 8px;}
+  .reasoning-box{background:var(--panel2);border-left:3px solid var(--acc);border-radius:6px;
+    padding:10px 12px;font-size:12.5px;color:var(--text);line-height:1.5;margin-bottom:14px;}
+  .reasoning-box.empty{color:var(--muted);font-style:italic;}
+  .clip-row{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:7px;}
+  .clip-row .cn{font-size:11px;color:var(--muted);}
+  .clip-row .cf{font-size:12.5px;font-weight:600;margin:2px 0 3px;word-break:break-all;}
+  .clip-row .cd{font-size:11.5px;color:var(--muted);}
+  .clip-row .cv{font-size:11px;color:#8ea2c6;margin-top:3px;}
+  .clip-row .ct{font-size:10.5px;color:var(--muted);margin-top:3px;font-style:italic;}
+  .preview-box{background:#000;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px;}
+  .preview-box video{width:100%;display:block;}
+  .preview-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:14px;}
+  .fake-btn{display:block;width:100%;text-align:center;background:var(--panel2);border:1px solid var(--line);
+    color:var(--muted);border-radius:7px;padding:8px;font-size:12.5px;margin-bottom:6px;cursor:not-allowed;}
+
+  /* feature / role blocks */
+  .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  @media (max-width:760px){.feature-grid{grid-template-columns:1fr;}}
+  .feature-block h3{font-size:15.5px;margin:0 0 8px;color:var(--text);}
+  .feature-block h3 .ico{color:var(--acc);margin-right:6px;}
+  .feature-block p{font-size:13.5px;color:var(--muted);line-height:1.6;margin:0;}
+  .feature-block p strong{color:var(--text);}
+
+  .stack-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;}
+  .chip{font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 10px;}
+
+  footer{border-top:1px solid var(--line);padding:26px 0;margin-top:0;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a href="#top" class="brand">Video <span>Editor</span><span class="tag">Demo</span></a>
+    <div class="nav-links">
+      <a href="https://alexandra-moldovan.netlify.app/#portfolio">← Portfolio</a>
+      <a href="#demo">Demo</a>
+      <a href="#features">What it does</a>
+      <a href="#role">My role</a>
+      <a href="https://alexandra-moldovan.netlify.app/projects/video-editor.html">Write-up</a>
+      <a href="https://github.com/AlexandraMoldovan95/video-editor" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</div>
+
+<main id="top">
+  <section class="hero" style="border-top:none;">
+    <div class="wrap">
+      <div class="eyebrow">Python · FastAPI · ffmpeg · local web app</div>
+      <h1>Video Editor</h1>
+      <p class="pitch">Turns raw clips and photos into a finished vertical (9:16) video for social media. <strong>Claude proposes the cut</strong>, the color and the on-screen text — the code validates the plan and renders it with ffmpeg, so the AI never touches ffmpeg directly. You stay in control: change or lock anything before it renders.</p>
+
+      <div class="cta-row">
+        <a href="#demo" class="btn btn-accent">Try it below ↓</a>
+        <a href="https://github.com/AlexandraMoldovan95/video-editor" class="btn" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><b>~2 min</b><span>for a first draft, vs. ~1 hour hand-editing the same 30s clip</span></div>
+        <div class="stat"><b>4</b><span>real crash/data-loss bugs found and fixed in a dedicated robustness audit</span></div>
+        <div class="stat"><b>3</b><span>ready-made demo plans below, no API key needed</span></div>
+      </div>
+
+      <div class="hero-media">
+        <img src="images/video-editor.jpg" alt="Video Editor app: uploaded clips, the AI's edit plan with its reasoning, and the timeline">
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Play with it</h2>
+        <p>A real, saved project — the same ten sample clips and photos the app was tested with — not a live install.</p>
+      </div>
+
+      <div class="demo-banner">
+        <strong>Static demo, not the live app.</strong> Everything below is real — the sample footage, the AI-generated edit plan and its reasoning, the per-clip color numbers, and the rendered video — but nothing here is running: this page doesn't call ffmpeg or the Claude API. Switching the preset swaps between three real, pre-built plans using plain JavaScript. The actual app needs ffmpeg and your own Anthropic API key, and runs as a local web server on your own machine — see <a href="https://github.com/AlexandraMoldovan95/video-editor" target="_blank" rel="noopener">the source on GitHub</a> to run it yourself.
+      </div>
+
+      <div class="shell">
+        <div class="shell-header">
+          <h3>Video <span>Editor</span></h3>
+          <span class="count">Project demo · 10 files</span>
+        </div>
+        <div class="demo-grid">
+
+          <div class="demo-col">
+            <h4>1 · Material</h4>
+            <div class="thumb-grid" id="material-grid"></div>
+          </div>
+
+          <div class="demo-col">
+            <h4>2 · Edit plan</h4>
+            <div class="preset-row" id="preset-row"></div>
+            <div class="chip-row2" id="chip-row"></div>
+            <div class="reasoning-box" id="reasoning-box"></div>
+            <div id="timeline-list"></div>
+          </div>
+
+          <div class="demo-col">
+            <h4>3 · Preview &amp; export</h4>
+            <div class="preview-box">
+              <video controls preload="metadata">
+                <source src="images/video-editor-demo/draft.mp4" type="video/mp4">
+              </video>
+            </div>
+            <p class="preview-note">Real rendered draft (540×960, the app's fast-preview resolution) from the "Cinematic travel story" plan, rendered by the actual ffmpeg pipeline — not a mockup.</p>
+            <button class="fake-btn" disabled title="Needs the real app">Render final</button>
+            <button class="fake-btn" disabled title="Needs the real app">⚡ Quick preview</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What it does</h2>
+        <p>Everything below is optional and toggleable — a Settings panel keeps the interface uncluttered.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3><span class="ico">●</span>AI editing</h3>
+          <p>Claude picks the order, cuts, color and text, and returns a plan the code validates before it ever touches ffmpeg. <strong>Lock</strong> any cut or text you like and regenerating only reworks what's unlocked — standing rules like "keep the opening 3s" apply automatically every time.</p>
+        </div>
+        <div class="feature-block">
+          <h3><span class="ico">●</span>Manual editing, once the draft lands</h3>
+          <p>A full NLE-style toolkit: undo/redo, drag-trim, a split tool, per-clip speed (0.25×–4×), manual pan/reframe, multi-select, free-drag text, plus B-roll, picture-in-picture and split-screen overlays.</p>
+        </div>
+        <div class="feature-block">
+          <h3><span class="ico">●</span>Audio and music</h3>
+          <p>Custom beat detection written from scratch in plain numpy finds the BPM and beat grid, so cuts and zoom punches can snap to the music while the original clip audio ducks automatically underneath.</p>
+        </div>
+        <div class="feature-block">
+          <h3><span class="ico">●</span>Previews and export</h3>
+          <p>A live quick-preview re-encodes only what changed, kept fully separate from the real export path. Export a finished MP4, or an FCPXML timeline that reopens your original files in DaVinci Resolve / Final Cut.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="role">
+    <div class="wrap">
+      <div class="section-head"><h2>My role</h2></div>
+      <div class="feature-grid">
+        <div class="feature-block">
+          <h3>Product and design</h3>
+          <p>Product idea, UX, and the <strong>"AI decides, code executes"</strong> boundary — the plan Claude returns is validated against a strict schema before any ffmpeg command runs. Built in pair-programming with Claude, starting from a written requirements doc and working through the pipeline stage by stage.</p>
+        </div>
+        <div class="feature-block">
+          <h3>Quality</h3>
+          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. No automated test suite yet — the honest gap next to this project's others.</p>
+        </div>
+        <div class="feature-block">
+          <h3>Architecture</h3>
+          <p>The AI never writes ffmpeg: <code>planner.py</code> calls Claude, <code>edl.py</code> validates the plan (overlaps, transitions, text) before <code>render.py</code> runs anything — an invalid plan gets one retry with the validation error attached. Beat tracking, subtitle timing, and the live-preview cache are each isolated so one feature's shortcuts can't leak into another's correctness.</p>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="chip">Python</span>
+        <span class="chip">FastAPI</span>
+        <span class="chip">ffmpeg</span>
+        <span class="chip">Claude API</span>
+        <span class="chip">Pydantic</span>
+        <span class="chip">numpy (beat tracking)</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap" style="text-align:center;">
+    <span style="color:var(--muted);font-size:13px;">Video Editor — MIT License</span>
+  </div>
+</footer>
+
+<script>
+// Real material metadata, read straight off the running app for this exact sample project.
+const MATERIAL = [
+  {f:"16928481_1080_1920_50fps.mp4", m:"16s · 9:16 · 50fps"},
+  {f:"16581829_1440_2560_60fps.mp4", m:"10.38s · 9:16 · 60fps"},
+  {f:"15940078_2160_3840_30fps.mp4", m:"16.13s · 9:16 · 30fps"},
+  {f:"16615054_2160_3840_25fps.mp4", m:"10.12s · 9:16 · 25fps"},
+  {f:"16931601_1080_1920_120fps.mp4", m:"7.43s · 9:16 · 120fps"},
+  {f:"17198558_3840_2160_30fps.mp4", m:"14.01s · 16:9 · 30fps"},
+  {f:"12772832_1080_1920_30fps.mp4", m:"13.3s · 9:16 · 30fps"},
+  {f:"pexels-ayse-ela-dikye-49914919-16268987.jpg", m:"photo · 9:16"},
+  {f:"pexels-hayriyenur-351892318-39457179.jpg", m:"photo · 16:9"},
+  {f:"pexels-santesson89-37765467.jpg", m:"photo · 9:16"},
+];
+
+// Real EDLs: energetic_reel and calm_vlog are hand-built examples matching their preset's rules
+// (app/demo_presets.py); travel_story is Claude's actual output for this material, as currently
+// edited in the live project (matches the plan in the screenshot on the GitHub README/project page).
+const PRESETS = {
+  travel_story: {
+    label: "Cinematic travel story",
+    chips: ["Target 15s", "Pace medium", "Color warm", "Vertical fit: blurred background", "Transitions subtle"],
+    reasoning: "We open with the whirling dervish (black & white, strong visual impact), then move through the warm, light-filled scenes (the forest with sun rays, the ferry at sunset, the horse at dusk) for rhythm, followed by the boat with Istanbul and the waterfall. A calm ending with the zoom-in photos and the horizontal clip on a blurred background. Cuts vary between 2 and 3 seconds; total ≈15s. The color starts from a warm base, with small adjustments for the black-and-white clips (reduced saturation) and the darker ones (brightness).",
+    clips: [
+      {source:"16928481_1080_1920_50fps.mp4", in:1.5, out:4.0, fit:"crop_center", brightness:0.02, contrast:1.1, saturation:1.0, warmth:0.05},
+      {source:"16581829_1440_2560_60fps.mp4", in:1.0, out:3.78, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08},
+      {source:"15940078_2160_3840_30fps.mp4", in:5.0, out:7.93, fit:"crop_center", brightness:0.08, contrast:1.05, saturation:1.1, warmth:0.08},
+      {source:"pexels-hayriyenur-351892318-39457179.jpg", duration:2.0, fit:"blur_pad", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08},
+      {source:"16615054_2160_3840_25fps.mp4", in:2.88, out:5.5, fit:"crop_center", brightness:0.03, contrast:1.05, saturation:1.1, warmth:0.08},
+      {source:"pexels-santesson89-37765467.jpg", duration:2.2, fit:"crop_center", brightness:0.03, contrast:1.05, saturation:1.1, warmth:0.08},
+    ],
+  },
+  energetic_reel: {
+    label: "Energetic reel",
+    chips: ["Target 15s", "Pace fast", "Color contrast", "Transitions dynamic", "Text title only"],
+    reasoning: "",
+    clips: [
+      {source:"16931601_1080_1920_120fps.mp4", in:0.5, out:1.7, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"slideleft"},
+      {source:"12772832_1080_1920_30fps.mp4", in:2.0, out:3.2, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"slideleft"},
+      {source:"16581829_1440_2560_60fps.mp4", in:1.0, out:2.3, fit:"crop_center", brightness:0.02, contrast:1.22, saturation:1.18, warmth:0.0, tr:"circleclose"},
+      {source:"16615054_2160_3840_25fps.mp4", in:3.0, out:4.2, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"wipeleft"},
+      {source:"16928481_1080_1920_50fps.mp4", in:5.0, out:6.2, fit:"crop_center", brightness:-0.02, contrast:1.2, saturation:1.15, warmth:0.0, tr:"smoothleft"},
+      {source:"15940078_2160_3840_30fps.mp4", in:2.0, out:3.2, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"circleopen"},
+      {source:"17198558_3840_2160_30fps.mp4", in:1.0, out:2.2, fit:"blur_pad", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"slideup"},
+      {source:"12772832_1080_1920_30fps.mp4", in:5.0, out:6.1, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"fadewhite"},
+      {source:"16931601_1080_1920_120fps.mp4", in:2.5, out:3.7, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"slideleft"},
+      {source:"16928481_1080_1920_50fps.mp4", in:8.0, out:9.1, fit:"crop_center", brightness:-0.02, contrast:1.2, saturation:1.15, warmth:0.0, tr:"circleclose"},
+      {source:"pexels-santesson89-37765467.jpg", duration:2.0, fit:"crop_center", brightness:0.0, contrast:1.2, saturation:1.15, warmth:0.0, tr:"wipeleft"},
+    ],
+  },
+  calm_vlog: {
+    label: "Calm vlog",
+    chips: ["Target 40s", "Pace slow", "Color warm", "Vertical fit: blurred background", "Transitions subtle"],
+    reasoning: "",
+    clips: [
+      {source:"15940078_2160_3840_30fps.mp4", in:0.0, out:4.5, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08},
+      {source:"16928481_1080_1920_50fps.mp4", in:2.0, out:6.0, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08, tr:"fade"},
+      {source:"17198558_3840_2160_30fps.mp4", in:0.5, out:4.5, fit:"blur_pad", brightness:0.03, contrast:1.05, saturation:1.08, warmth:0.07, tr:"dissolve"},
+      {source:"12772832_1080_1920_30fps.mp4", in:1.0, out:5.0, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08, tr:"fade"},
+      {source:"16581829_1440_2560_60fps.mp4", in:0.5, out:4.0, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08, tr:"dissolve"},
+      {source:"16615054_2160_3840_25fps.mp4", in:0.5, out:4.0, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08, tr:"fade"},
+      {source:"16931601_1080_1920_120fps.mp4", in:0.3, out:3.8, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08, tr:"fadeblack"},
+      {source:"pexels-hayriyenur-351892318-39457179.jpg", duration:4.0, fit:"blur_pad", brightness:0.03, contrast:1.05, saturation:1.08, warmth:0.07, tr:"fade"},
+      {source:"15940078_2160_3840_30fps.mp4", in:8.0, out:12.0, fit:"crop_center", brightness:0.02, contrast:1.05, saturation:1.1, warmth:0.08, tr:"dissolve"},
+      {source:"pexels-ayse-ela-dikye-49914919-16268987.jpg", duration:3.5, fit:"crop_center", brightness:0.03, contrast:1.05, saturation:1.08, warmth:0.07, tr:"fade"},
+    ],
+  },
+};
+
+const TR_NAMES = {slideleft:"slide left", circleclose:"circle close", wipeleft:"wipe left",
+  smoothleft:"smooth left", circleopen:"circle open", slideup:"slide up", fadewhite:"fade white",
+  fade:"fade", dissolve:"dissolve", fadeblack:"fade to black"};
+
+function fmtNum(n){
+  const s = n.toFixed(2).replace(/0+$/,"").replace(/\.$/,"");
+  return s === "" || s === "-" ? "0" : s;
+}
+function signed(n){ return (n >= 0 ? "+" : "") + fmtNum(n); }
+
+function renderMaterial(){
+  const grid = document.getElementById("material-grid");
+  grid.innerHTML = MATERIAL.map(m => `
+    <div class="thumb-card">
+      <img src="images/video-editor-demo/${m.f.replace(/\.(mp4|jpg)$/,'')}.jpg" alt="${m.f}" loading="lazy">
+      <div class="nm">${m.f}</div>
+      <div class="mt">${m.m}</div>
+    </div>`).join("");
+}
+
+function renderPlan(key){
+  const p = PRESETS[key];
+
+  document.getElementById("preset-row").innerHTML = Object.keys(PRESETS).map(k => `
+    <button class="preset-btn${k===key?' active':''}" data-key="${k}">${PRESETS[k].label}</button>`).join("");
+  document.querySelectorAll(".preset-btn").forEach(b => b.addEventListener("click", () => renderPlan(b.dataset.key)));
+
+  document.getElementById("chip-row").innerHTML = p.chips.map(c => `<span class="vchip">${c}</span>`).join("");
+
+  const rb = document.getElementById("reasoning-box");
+  if (p.reasoning) {
+    rb.className = "reasoning-box";
+    rb.textContent = p.reasoning;
+  } else {
+    rb.className = "reasoning-box empty";
+    rb.textContent = "No AI reasoning for this one — hand-built example matching the preset's own rules, not a live model call.";
+  }
+
+  document.getElementById("timeline-list").innerHTML = p.clips.map((c, i) => {
+    const dur = c.duration != null ? c.duration : (c.out - c.in);
+    const range = c.duration != null ? `photo · ${fmtNum(dur)}s` : `${fmtNum(c.in)}–${fmtNum(c.out)}s · ${fmtNum(dur)}s`;
+    const fit = c.fit === "blur_pad" ? "blurred" : "crop";
+    const trLabel = i === 0 ? "" : `<div class="ct">| ${c.tr ? TR_NAMES[c.tr] || c.tr : "direct cut"}</div>`;
+    return `
+      <div class="clip-row">
+        <div class="cn">${i + 1}</div>
+        <div class="cf">${c.source}</div>
+        <div class="cd">${range} · ${fit}</div>
+        <div class="cv">B ${signed(c.brightness)} · C ${fmtNum(c.contrast)}× · S ${fmtNum(c.saturation)}× · W ${signed(c.warmth)}</div>
+        ${trLabel}
+      </div>`;
+  }).join("");
+}
+
+renderMaterial();
+renderPlan("travel_story");
+</script>
+</body>
+</html>
