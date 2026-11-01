@@ -1,59 +1,74 @@
 <h1 align="center">Video Editor</h1>
 
 <p align="center">
-  <b>A local web app that turns raw footage — clips, photos, a song — into a vertical 9:16 video for social media.</b><br>
-  Claude (the AI) chooses the order, the cuts, the color, the transitions and the on-screen text. You can adjust anything and <b>lock</b> what you like.
+  <b>Turns raw footage — clips, photos, a song — into a finished vertical video for social media.</b><br>
+  An AI (Claude) proposes the cut, the color and the on-screen text. You can change or lock anything before it renders.
 </p>
 
 <p align="center">
-  <i>Python + FastAPI + ffmpeg + Claude API (<code>claude-sonnet-5-5</code>)</i>
+  <i>Python · FastAPI · ffmpeg · Claude API</i>
 </p>
 
 ![Video Editor — upload, AI plan and timeline, preview & export](docs/media/hero.jpg)
 
+### At a glance
+
 | | |
 |---|---|
-| **What** | Local Python web app (FastAPI backend, single-file vanilla-JS frontend) · ffmpeg for rendering · Claude API for the editing decisions · Windows |
-| **My role** | Product idea, UX, the "AI decides, code executes" architecture, and all manual testing. The code was written in pair-programming with an AI assistant (Claude): see [How it was built](#how-it-was-built). |
-| **Quality** | Manually verified end to end: render pipeline (hand-written EDL → correct MP4), the AI planner with a real preset, and the FastAPI server + frontend (Playwright). The manual editing tools were verified against synthetic ffmpeg test media and, for the full combined feature set, a real end-to-end render through the live FastAPI app against the project's own real sample files. Harder-to-verify features (overlay compositing, J/L-cut audio timing, the beat-punch filter graph) were checked with purpose-built test clips and quantitative checks — exact pixel colors, audio frequency isolation — not just "it rendered." A later robustness pass specifically tried to break the app (corrupt uploads, partial-write crashes, unbounded growth) and fixed four real issues it found. No automated test suite yet. |
-| **Status** | Personal/portfolio project, all planned features implemented. Honest open items below — Whisper transcription and the DaVinci Resolve import still need to be tried on a normal Windows network/install. |
+| **What** | Local web app: FastAPI backend, single-file JS frontend, ffmpeg for rendering, Claude for the editing decisions. Windows. |
+| **My role** | Product idea, UX, the "AI decides, code executes" architecture, and all testing. Built in pair-programming with Claude — see [How it was built](#how-it-was-built). |
+| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). No automated test suite yet. |
+| **Status** | Personal/portfolio project, all planned features implemented. Two (Whisper subtitles, DaVinci import) are still untested on a normal install — see [Known limitations](#known-limitations-honest). |
 
 ## Why it exists
 
-Editing a 30-second reel by hand — picking the best seconds out of raw clips, cutting them to a beat, adding text — easily takes an hour. This app gets a solid first draft in about two minutes: you drop in your clips and photos, pick a style, and an AI plans the edit. You stay in control — adjust anything, **lock 🔒** the cuts and texts you like, and regenerate only the rest.
+Hand-editing a 30-second reel — picking the best moments, cutting to a beat, adding text — takes about an hour. This app gets a solid first draft in two minutes: drop in clips and photos, pick a style, and the AI plans the edit. You stay in control: adjust anything, **lock 🔒** what already works, and regenerate only the rest.
 
-## Highlights
+## What it does
 
-- **"AI decides, code executes."** Claude never touches ffmpeg. It returns a JSON edit plan that is validated against a strict schema (Pydantic) before any video command runs — no command injection, reproducible output, and errors that are easy to debug and retry.
-- **Per-file control the AI can't override**: mark a clip required or excluded, lock its usable time range, fix its color or volume, add a note — the code enforces these as hard constraints, the AI only fills in the rest.
-- **Lock and regenerate**: lock the cuts and texts that already work, hit Regenerate, and the AI only reworks what's left — your edits are never silently lost.
-- **Music-aware editing**: custom beat detection written in plain numpy (no librosa) finds the BPM and beat grid; cuts can snap to the beat, with ducking so the original clip audio stays audible under the music.
-- **Two export paths**: a finished MP4 (draft or 1080×1920 final), or an FCPXML timeline that reopens the *original* files in DaVinci Resolve/Final Cut for a full manual re-edit.
-- **Optional subtitles**: Whisper transcribes speech and subtitles are recalculated live from the current timeline, so they never go out of sync with your edits.
-- **Try a demo, no API key needed**: three pre-built example plans (`app/demo_presets.py`) load instantly over the same sample clips and show three very different edits — fast/contrasty, slow/warm, cinematic travel. Two are hand-built to match a preset's rules; the third replays a real saved Claude run. None of the three calls the API, so anyone can see the mechanism work without spending anything.
-- **A full manual editing pass once the AI draft lands** — none of it calls the API, all of it is plain timeline editing: undo/redo and NLE-style keyboard shortcuts (Space/J/K/L/I/O/S/Del/Ctrl+Z); drag-trim a clip's in/out directly on the timeline bar; a split (razor) tool at the preview's playhead; per-clip speed (0.25×–4×, with matching audio time-stretch); manual reframe/pan on top of the auto-crop; a per-clip waveform drawn on the timeline from the source audio; shift/ctrl-click multi-select with bulk lock/delete/color-grade; and free-drag text placement instead of only top/center/bottom.
-- **Standing lock rules, not just one-off locks**: beyond locking a clip by hand, you can set a persistent rule ("keep the opening 3s", "never touch clips from this file") that's re-applied automatically before every AI regeneration — set it once instead of re-locking the same clips every time.
-- **Multiple AI drafts in one pass**: generate up to three structurally different takes (different opening, pace, or selection of moments) in parallel from the same material, and pick the one that works instead of re-rolling one at a time.
-- **Deep scan on a single clip**: for a fast or ambiguous moment the first pass (4 frames) can misjudge, re-examine just that one cut with 20 frames across a wider window — without touching the rest of the timeline.
-- **B-roll / picture-in-picture / split-screen**: layer a second clip or photo over part of the timeline — a PIP corner box or a 50/50 split — composited on top of the main video, always muted so the original audio is never doubled.
-- **J/L cuts**: a clip's own sound can start before its picture (J-cut) or keep playing after it ends (L-cut), borrowing time from the neighboring clip with a crossfade — the soft audio handoffs editors use to hide a hard cut.
-- **Beat-synced visual punches**: an optional quick zoom pulse on every Nth beat of the music, so the cut rhythm has a visual accent instead of just an audio one.
-- **Live, incremental preview**: a "Quick preview" that re-encodes only the clips you actually changed since the last preview (a disk cache keyed by each clip's own parameters) — much faster than a full draft render once you've previewed once, and architecturally walled off from the real export path so a low-quality preview segment can never leak into a final render.
-- **SFX library and a second ambience bed**: five bundled one-shot sound effects (whoosh, ding, impact, pop, click) placed anywhere on the timeline, plus an optional ambience track (room tone, crowd, rain) layered under the music with its own volume/fade, independent of beat sync.
-- **A Settings panel that keeps the UI calm**: every major feature (overlays, quick preview, lock rules, AI variants...) can be toggled on or off from one place, so the interface only shows what you actually use; a right-click menu on a clip offers the same actions you'd find as buttons elsewhere, just one click closer.
+**AI editing**
+- Claude picks the order, cuts, color and text, and returns a plan the code validates before it ever touches ffmpeg — the AI never writes ffmpeg itself.
+- Lock any cut or text you like; regenerating only reworks what's unlocked.
+- Standing lock rules ("keep the opening 3s", "never touch this file") apply automatically on every regeneration.
+- Up to 3 different AI takes in one pass, so you compare instead of re-rolling one at a time.
+- Deep scan: re-examine one ambiguous cut with 20 frames instead of 4, without touching the rest of the timeline.
+- Per-file overrides the AI can't fight: mark a clip required or excluded, lock its usable range, fix its color — the code enforces these as hard limits.
 
-## Engineering in short
+**Manual editing, once the AI draft lands**
+- Full NLE-style toolkit: undo/redo, keyboard shortcuts, drag-trim, a split tool, per-clip speed (0.25×–4×), manual pan/reframe, a waveform display, multi-select.
+- B-roll, picture-in-picture, and split-screen overlays.
+- J/L cuts — a clip's sound can start early or run past its picture, the way editors hide a hard cut.
+- Beat-synced zoom punches on the music.
+- Free-drag text placement.
 
-- **The AI never writes ffmpeg.** `planner.py` calls Claude with a `submit_edl` tool; the result is validated by `edl.py` (overlaps, transition rules, text placement) before `render.py` ever runs. An invalid plan is rejected and Claude gets one retry with the validation error.
-- **Beat tracking from scratch**: `music.py` computes an onset envelope and runs dynamic-programming beat tracking (Ellis 2007-style) in numpy only — no external beat-detection library.
-- **Subtitles are never stored, only recomputed**: `subtitles.py` derives subtitle timing from the transcript and the *current* cut list on every render, so moving a clip can never desync a caption.
-- **Hard constraints vs. AI suggestions**: `hints.py` keeps the two cleanly separate — what you fix on a file is enforced by code regardless of what the AI proposes.
-- **ffmpeg orchestration**: `render.py` normalizes every clip to a common format, applies `xfade`/concat for transitions and `drawtext` for on-screen text, then mixes original audio with music and ducking.
-- **FCPXML export**: `fcpxml.py` builds a DaVinci/Final Cut timeline that references the *original* source files (not the rendered MP4), so color, cuts and framing stay editable — validated against OpenTimelineIO for frame-accurate timing.
-- **Overlay compositing**: a second ffmpeg `overlay` pass, time-gated with `enable='between(t,start,end)'`, runs *after* the main timeline is assembled and *before* text is drawn, so captions always end up on top of a PIP/split layer instead of hidden behind it.
-- **Beat punches without a time-aware `crop`**: the ffmpeg build this targets evaluates `crop`'s width/height once at filter-graph init, not per frame, so a frame-by-frame zoom pulse instead drives the `zoompan` filter (`d=1`, indexed on the output frame counter) — found by reading `ffmpeg -h filter=crop` after the obvious approach failed at graph-build time.
-- **A segment cache for live preview, walled off from real exports**: `render_preview()` keys each clip's encoded segment by a hash of its own parameters *and* the source file actually read, so editing one clip never forces every other clip to re-encode; `render()` (the real export) never receives a cache directory and never sees proxy media, so a preview-quality segment can't end up in a final render by construction, not by convention.
-- **Hardened against partial failures**: a single corrupted or unsupported upload used to take the whole project down (every route that lists media called a function that raised on the first bad file); each file is now probed independently, bad ones are skipped and reported instead of crashing the batch, project state is written atomically (temp file + rename), and finished background jobs are pruned so a long-running session doesn't leak memory.
+**Audio and music**
+- Custom beat detection in plain numpy (no external library) finds the BPM and beat grid.
+- Cuts can snap to the beat; the original clip audio ducks automatically under the music.
+- A second ambience layer (room tone, rain, crowd) under the music.
+- 5 bundled sound effects, placed anywhere on the timeline.
+
+**Previews and export**
+- Live quick-preview: only re-encodes the clips you changed, kept fully separate from the real export path so a low-quality preview can never leak into a final render.
+- Optional subtitles (Whisper), recalculated live from the current timeline so they never go out of sync with your edits.
+- Export a finished MP4, or an FCPXML timeline that reopens your *original* files in DaVinci Resolve / Final Cut.
+- Try 3 demo edits instantly, no API key needed.
+
+Everything above is optional and toggleable — a Settings panel keeps the interface uncluttered, and a right-click menu on a clip mirrors the main actions.
+
+## How it's built
+
+- **The AI never writes ffmpeg.** `planner.py` calls Claude; `edl.py` validates the result (overlaps, transitions, text) before `render.py` runs anything. An invalid plan gets one retry with the validation error.
+- **Beat tracking from scratch.** `music.py` runs onset detection and dynamic-programming beat tracking in plain numpy — no external beat library.
+- **Subtitles are recomputed, never stored.** `subtitles.py` derives timing from the transcript and the current cut list on every render, so moving a clip can't desync a caption.
+- **Hard constraints vs. AI suggestions are kept separate.** `hints.py` enforces what you fix on a file regardless of what the AI proposes.
+- **ffmpeg orchestration.** `render.py` normalizes every clip, applies `xfade`/concat for transitions and `drawtext` for text, then mixes original audio with music.
+- **FCPXML export.** `fcpxml.py` builds a DaVinci/Final Cut timeline against the *original* files, validated against OpenTimelineIO for frame accuracy.
+- **Overlay compositing** runs after the main timeline and before text, so captions stay visible on top of a PIP/split layer.
+- **Beat punches use `zoompan`, not `crop`** — this ffmpeg build can't animate `crop` per frame, so the zoom pulse drives `zoompan` instead (found by reading `ffmpeg -h filter=crop` after the obvious approach failed).
+- **The live-preview cache is walled off from real exports.** `render()` never receives a cache directory or sees proxy media, so a preview-quality segment can't end up in a final render.
+- **Hardened against partial failures.** A single bad upload used to take the whole project down; each file is now probed independently, project state is written atomically, and finished jobs are pruned so a long session doesn't leak memory.
+
+The full technical write-up — every decision above, explained in depth — is in [CLAUDE.md](CLAUDE.md).
 
 | Module | Role |
 |---|---|
@@ -95,13 +110,13 @@ The model downloads on first use (~460 MB, `small`). A smaller model is availabl
 
 ## Known limitations (honest)
 
-- **The AI only sees 4 frames per clip.** It picks well on calm footage, but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.
+- **The AI only sees 4 frames per clip.** It picks well on calm footage but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.
 - **Beat tracking is tested on synthetic tracks** (128 and 95 BPM, ~22ms error). On music without a clear drum hit it can get it wrong — turn off "On beat" for that track.
 - **Whisper and the DaVinci import are still untested on a normal network/install.** Whisper's model download is blocked in the sandboxed environment this was developed in; the subtitle *logic* was verified with a simulated transcript, and the FCPXML timing was validated against OpenTimelineIO, but neither has been exercised for real yet.
 - **No YouTube support, on purpose** — downloading from it breaks YouTube's terms, and licensed music gets muted or claimed on most platforms anyway. For TikTok/Reels, export without music and add the same track from inside the app.
 - Uploaded files are copied into the project folder, so a project's disk footprint adds up.
-- **The FCPXML export doesn't carry over every manual tool**: a sped-up/slowed-down clip, a manually panned crop, a freely-dragged text, B-roll/PIP/split-screen overlays, and beat-synced zoom punches all stay specific to this app's own renderer and don't reach DaVinci/Final Cut — redo those by hand there if you want to keep the look. Everything else (cuts, color look's base values, transitions-as-dissolve, music) does transfer.
-- **A clip's waveform only shows up if the clip has its own audio.** Silent b-roll (most stock footage, including this project's own Pexels demo sample clips) has nothing to draw — that's expected, not a bug.
+- **The FCPXML export doesn't carry over every manual tool**: speed changes, manual pan/crop, freely-dragged text, overlays, and beat punches stay specific to this app's renderer and don't reach DaVinci/Final Cut — redo those by hand there if you want to keep the look. Everything else (cuts, color look's base values, transitions-as-dissolve, music) does transfer.
+- **A clip's waveform only shows up if the clip has its own audio.** Silent b-roll (most stock footage, including this project's own Pexels demo clips) has nothing to draw — expected, not a bug.
 
 ## API cost
 
@@ -109,9 +124,9 @@ One plan generation costs roughly 18–22k input tokens and 2–3k output tokens
 
 ## How it was built
 
-I own the product: I picked the idea (I kept hand-editing the same kind of 30-second clip and wanted the first draft automated), decided the "AI decides, code executes" boundary, and tested every stage by hand against real footage — a hand-written EDL through the render pipeline, the AI planner end to end with a real preset, and the FastAPI server with the frontend via Playwright.
+I own the product: I picked the idea (I kept hand-editing the same kind of 30-second clip and wanted the first draft automated), decided the "AI decides, code executes" boundary, and tested every stage by hand against real footage.
 
-The code was written in pair-programming with Claude (Anthropic's AI assistant), starting from a written requirements doc and working through the pipeline stage by stage: metadata and plain-ffmpeg rendering first, then frame sampling and the AI planner, then the FastAPI server and UI, then music/beat sync, subtitles and the DaVinci export. A later pass added B-roll/PIP/split-screen overlays, J/L-cut audio, beat-synced visual punches and a cached live preview, a Settings panel to keep all of it optional, and a dedicated robustness audit. The deeper technical write-up of how each piece works lives in [CLAUDE.md](CLAUDE.md) — the same file used as working context while building it.
+The code was written in pair-programming with Claude (Anthropic's AI assistant), starting from a written requirements doc and working through the pipeline stage by stage: metadata and plain-ffmpeg rendering first, then frame sampling and the AI planner, then the FastAPI server and UI, then music/beat sync, subtitles and the DaVinci export. A later pass added overlays, J/L-cut audio, beat-synced punches, a cached live preview, a Settings panel, and a dedicated robustness audit. The deeper technical write-up of how each piece works lives in [CLAUDE.md](CLAUDE.md) — the same file used as working context while building it.
 
 ## License
 

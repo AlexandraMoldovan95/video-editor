@@ -109,30 +109,38 @@ python -m app.planner --preset travel_cinematic --dry-run     # see the prompt, 
 
 ### Overlays (B-roll / PIP / split-screen)
 
-A second video/photo layer composited on top of the main timeline for a time window, always muted (the main timeline's own audio keeps playing underneath). Implemented as its own `filter_complex` pass, **after** the main assembly and **before** the final text pass — so captions always end up visibly on top of a PIP/split layer, never hidden behind one. The ffmpeg `overlay` filter's position expressions must use `overlay_w`/`overlay_h` (not `ow`/`oh` — that naming belongs to a different filter); getting this wrong fails only at filter-graph evaluation time, not at validation.
+A second video/photo layer over part of the timeline — a PIP corner box or a 50/50 split — always muted so the main audio keeps playing underneath. It's its own `filter_complex` pass, run **after** the main timeline is assembled and **before** text is drawn, so captions stay on top of the overlay instead of hidden behind it.
+
+Gotcha: the `overlay` filter's position expressions need `overlay_w`/`overlay_h`, not `ow`/`oh` (that naming belongs to a different filter). Getting it wrong only fails at filter-graph evaluation time, not at validation.
 
 ### J/L cuts (asymmetric audio trim)
 
-`Clip.audio_lead` / `audio_lag` let a clip's own sound start before its picture (J-cut, "borrowed" from the previous clip's on-screen time) or keep playing after its picture ends (L-cut, borrowed from the next clip's time), each with a crossfade across the borrowed window. Clamped twice: once structurally against the neighboring clip's own on-screen duration (`clamp_audio_trim` in `edl.py`), and again at render time against how much raw source footage the file actually has beyond the cut (`build_original_audio` in `render.py`).
+`Clip.audio_lead` / `audio_lag` let a clip's sound start before its picture (J-cut) or run past it (L-cut), each with a crossfade over the borrowed window.
+
+Clamped twice, so it can never ask for more than exists: once structurally, against the neighboring clip's own on-screen duration (`clamp_audio_trim` in `edl.py`); again at render time, against how much raw source footage actually exists past the cut (`build_original_audio` in `render.py`).
 
 ### Beat-synced visual punches
 
-A quick whole-frame zoom pulse on every Nth beat of the music (`MusicSettings.punch`/`punch_every`/`punch_amount`, read from the same beat grid as beat-sync — same panel, not a separate feature). The ffmpeg build this targets evaluates `crop`'s `w`/`h` once at filter-graph init (no `eval=frame` option), so a frame-by-frame zoom instead drives the `zoompan` filter with `d=1` (no frame duplication) and an expression indexed on the output frame counter (`on`), not on time. Applied as a final pass, after overlays and text, so the punch affects the whole composited frame.
+A quick whole-frame zoom pulse on every Nth beat (`MusicSettings.punch`/`punch_every`/`punch_amount`), reading the same beat grid as beat-sync — same feature, not a separate system.
+
+Why `zoompan` and not `crop`: this ffmpeg build evaluates `crop`'s width/height once at filter-graph init, so it can't pulse frame by frame. `zoompan` with `d=1` (no frame duplication), indexed on the output frame counter instead of time, does the same job per frame. Found by reading `ffmpeg -h filter=crop` after the obvious `crop` approach failed at graph-build time. Applied last, after overlays and text, so the punch hits the whole composited frame.
 
 ### Live/quick preview
 
-A deliberately separate, faster path (`render_preview()`) for "see my edit now," not a substitute for a real draft: it runs on proxy media (see below) at quarter resolution, and caches each clip's own rendered segment on disk, keyed by a hash of the clip's parameters *and* the actual source file read (path + mtime). Editing one clip only re-encodes that one; every untouched clip reuses its cached segment. **Architecturally walled off from the real export**: `render()` (draft/final) never receives a cache directory and never sees proxy media — a preview-quality segment cannot end up in a real export, by construction rather than convention. Old cache entries (>2 days) are pruned opportunistically on upload.
+`render_preview()` is a separate, faster path for "see my edit now" — not a substitute for a real draft. It runs on proxy media at quarter resolution and caches each clip's rendered segment on disk, keyed by the clip's parameters and the source file read (path + mtime). Editing one clip only re-encodes that one; every untouched clip reuses its cached segment.
+
+Kept away from the real export on purpose: `render()` (draft/final) never receives a cache directory and never sees proxy media, so a preview-quality segment can't end up in a real export. Old cache entries older than 2 days are pruned on upload.
 
 ### Background proxies
 
-`proxy.py` transcodes every uploaded video down to a small, fast-seeking 640px-wide copy in the background right after upload. Anything preview-only (AI frame extraction, the timeline filmstrip, deep scan, the waveform) reads the proxy once it's ready, falling back to the original automatically while it's still transcoding or if it fails. **`render.py` never reads a proxy** — the final export always reads the original file.
+`proxy.py` transcodes every uploaded video to a small, fast-seeking 640px-wide copy in the background right after upload. Anything preview-only — AI frame extraction, the timeline filmstrip, deep scan, the waveform — reads the proxy once it's ready, and falls back to the original while it's still transcoding or if it fails. `render.py` never reads a proxy: the final export always uses the original file.
 
 ## 8. Audio: original sound, ducking, music, ambience, SFX
 
 - `Clip.volume` controls the clip's *original* sound; video segments are always rendered muted (`-an`), with audio built as a separate pass.
 - `build_original_audio()` produces one audio chunk per cut, exactly `main_frames/fps` seconds long (sample-accurate at 48kHz/30fps), with a short anti-pop fade; silent clips/photos become silence.
-- `mux_audio()` layers music + ambience (summed first if both are present) + the original track + one-shot SFX. The background bed is automatically ducked under the original sound via `sidechaincompress`, unless turned off. SFX are mixed in last, after ducking, so a whoosh/ding cuts through instead of being dampened like a bed.
-- Music beat detection is hand-rolled in plain numpy (no external beat-detection library): spectral flux over 40 log-spaced frequency bands → tempo from autocorrelation (weighted toward ~120 BPM) → beat positions via dynamic-programming beat tracking (Ellis 2007-style). The AI sees BPM, time remaining in the track, and a per-second energy curve, and is asked to place more dynamic clips on higher-energy sections; the actual snap-to-beat is done by code (`snap_to_beats`), never by the AI.
+- `mux_audio()` layers music + ambience (summed first if both are present) + the original track + one-shot SFX. The background bed is ducked under the original sound via `sidechaincompress`, unless turned off. SFX are mixed in last, after ducking, so a whoosh/ding cuts through instead of being dampened like a bed.
+- Beat detection is hand-rolled in plain numpy, no external library: spectral flux over 40 log-spaced frequency bands → tempo from autocorrelation (weighted toward ~120 BPM) → beat positions via dynamic-programming beat tracking (Ellis 2007-style). The AI sees BPM, time remaining in the track, and a per-second energy curve, and is asked to place more dynamic clips on higher-energy sections. The actual snap-to-beat is done by code (`snap_to_beats`), never by the AI.
 
 ## 9. Subtitles and DaVinci export
 
@@ -142,16 +150,16 @@ A deliberately separate, faster path (`render_preview()`) for "see my edit now,"
 
 ## 10. Robustness audit (fixes applied)
 
-A pass through the whole codebase looking specifically for what could crash the server, lose or corrupt project data, grow unbounded on disk/memory, or confuse the user, found and fixed four real issues:
+A pass through the whole codebase, looking specifically for what could crash the server, lose or corrupt project data, grow unbounded on disk/memory, or confuse the user. Found and fixed four real issues:
 
-1. **A single corrupt file used to take the whole project down.** `scan_media()` called `ffprobe` with `check=True` on every file in the input folder; one corrupt or unsupported file (an interrupted upload, the wrong format under the right extension) made it raise — and almost every route (`get_project`, `upload`, `render`, `plan`, `deepscan`, FCPXML export...) calls `scan_media` unconditionally. The project became completely inaccessible from the UI, with no way to recover without editing files on disk. **Fixed**: a file that fails to probe is now skipped (and logged) instead of taking the whole directory down with it.
-2. **Upload reported a generic error, or crashed the same way.** `upload()` assumed every file written to disk would also show up in `scan_media()`'s result, so one bad file in a batch raised a bare `KeyError` and failed the *entire* upload, including the files that were fine. **Fixed**: each file is now handled independently — good ones get a thumbnail as before, unreadable ones are deleted and reported separately (`{"saved": [...], "rejected": [...]}`), so the user sees exactly which file didn't work instead of an opaque failure.
-3. **Project state wasn't written atomically.** `save_state()` wrote straight over `state.json`; a server interruption at exactly that moment (crash, forced quit, power loss) could leave the file truncated, making the project unloadable afterward. **Fixed**: write to a temp file and atomically replace it, the same pattern already used for proxies — a reader always sees either the complete old file or the complete new one, never a half-written one.
-4. **The in-memory job registry never shrank.** Every plan/render/preview/deep-scan click added an entry that stayed for the life of the process. **Fixed**: finished jobs older than an hour are pruned whenever a new job is created; anything still running is never touched.
+1. **One corrupt file could take down the whole project.** `scan_media()` ran `ffprobe` with `check=True` on every file; one bad file (an interrupted upload, wrong format under the right extension) raised an exception, and nearly every route (`get_project`, `upload`, `render`, `plan`, `deepscan`, FCPXML export...) calls `scan_media`. The whole project became inaccessible from the UI, with no fix short of editing files on disk. **Fixed**: a file that fails to probe is now skipped and logged instead of taking the rest down with it.
+2. **Upload failed the whole batch for one bad file.** `upload()` assumed every saved file would also show up in `scan_media()`'s result, so one bad file in a batch raised a bare `KeyError` and failed every file in that upload, including the good ones. **Fixed**: each file is now handled independently. Good ones get a thumbnail as before; bad ones are deleted and reported separately (`{"saved": [...], "rejected": [...]}`), so the user sees exactly which file failed instead of one opaque error.
+3. **Project state wasn't written atomically.** `save_state()` wrote straight over `state.json`; a server interruption at exactly that moment (crash, forced quit, power loss) could leave the file truncated and the project unloadable. **Fixed**: write to a temp file and atomically replace it, the same pattern already used for proxies — a reader always sees either the complete old file or the complete new one, never a half-written one.
+4. **The in-memory job registry never shrank.** Every plan/render/preview/deep-scan click added an entry that stayed for the life of the process. **Fixed**: finished jobs older than an hour are pruned whenever a new job is created; anything still running is left alone.
 
-Verified with an actual end-to-end test (not just "starts without error"): uploading a valid file and a corrupt one in the same request now returns `200` with the corrupt one correctly reported as rejected, and loading the project afterward — which used to return `500` — works normally and shows only the valid file.
+Verified with a real end-to-end test, not just "starts without error": uploading a valid file and a corrupt one in the same request now returns `200` with the corrupt one correctly reported as rejected, and loading the project afterward — which used to return `500` — works normally and shows only the valid file.
 
-**Known, accepted trade-offs** (not bugs, not changed without being asked to): the preview segment cache is pruned by age (2 days), not by size, so a very long single session can accumulate a fair number of small cached segments; ffmpeg calls have no timeout, since a long render is often legitimate and a blanket timeout would cut those off too.
+**Known, accepted trade-offs** (not bugs): the preview segment cache is pruned by age (2 days), not by size, so a very long single session can accumulate a fair number of small cached segments. ffmpeg calls have no timeout, since a long render is often legitimate and a blanket timeout would cut those off too.
 
 ## 11. Conventions
 
