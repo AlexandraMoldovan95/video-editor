@@ -32,10 +32,6 @@
   .topbar-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;max-width:1040px;margin:0 auto;width:100%;}
   .brand{display:flex;align-items:center;gap:8px;font-weight:650;font-size:15px;color:var(--text);}
   .brand span{color:var(--acc);}
-  .brand .tag{
-    font-size:10.5px;font-weight:650;letter-spacing:.04em;color:#1a0d06;background:var(--acc);
-    border-radius:4px;padding:2px 7px;text-transform:uppercase;
-  }
   .nav-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
   .nav-links a{color:var(--muted);font-size:13.5px;}
   .nav-links a:hover{color:var(--text);text-decoration:none;}
@@ -121,6 +117,31 @@
   .stack-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;}
   .chip{font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:4px 10px;}
 
+  /* scroll-reveal + subtle motion */
+  @media (prefers-reduced-motion: no-preference){
+    .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease;}
+    .reveal.is-visible{opacity:1;transform:translateY(0);}
+  }
+  .feature-block,.stat,.thumb-card{transition:transform .18s ease,border-color .18s ease;}
+  .feature-block:hover{transform:translateY(-3px);}
+  .stat:hover b{color:var(--acc);}
+  .thumb-card:hover{transform:translateY(-2px);border-color:var(--muted);}
+  .preset-btn{transition:transform .12s ease;}
+  .preset-btn:active{transform:scale(.97);}
+
+  /* prose / highlights / limitations - new content blocks */
+  .quote{border-left:3px solid var(--acc);padding:4px 0 4px 18px;margin:0 0 18px;color:var(--muted);font-style:italic;font-size:15px;line-height:1.6;}
+  .prose p{color:var(--muted);font-size:14.5px;line-height:1.7;max-width:720px;margin:0;}
+  .prose strong{color:var(--text);}
+  .highlight-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px;max-width:760px;}
+  .highlight-list li{font-size:14px;color:var(--muted);line-height:1.65;padding-left:22px;position:relative;}
+  .highlight-list li::before{content:"✓";position:absolute;left:0;color:var(--ok);font-weight:650;}
+  .highlight-list li strong{color:var(--text);}
+  .limits{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;max-width:760px;}
+  .limits li{font-size:13.5px;color:var(--muted);line-height:1.6;padding-left:18px;position:relative;}
+  .limits li::before{content:"–";position:absolute;left:0;color:var(--acc);}
+  .limits li strong{color:var(--text);}
+
   footer{border-top:1px solid var(--line);padding:26px 0;margin-top:0;}
 </style>
 </head>
@@ -128,10 +149,10 @@
 
 <div class="topbar">
   <div class="topbar-inner">
-    <a href="#top" class="brand">Video <span>Editor</span><span class="tag">Demo</span></a>
+    <a href="#top" class="brand">Video <span>Editor</span></a>
     <div class="nav-links">
       <a href="https://alexandra-moldovan.netlify.app/#portfolio">← Portfolio</a>
-      <a href="#demo">Demo</a>
+      <a href="#demo">Try it</a>
       <a href="#features">What it does</a>
       <a href="#role">My role</a>
       <a href="https://alexandra-moldovan.netlify.app/projects/video-editor.html">Write-up</a>
@@ -141,7 +162,7 @@
 </div>
 
 <main id="top">
-  <section class="hero" style="border-top:none;">
+  <section class="hero reveal" style="border-top:none;">
     <div class="wrap">
       <div class="eyebrow">Python · FastAPI · ffmpeg · local web app</div>
       <h1>Video Editor</h1>
@@ -164,7 +185,7 @@
     </div>
   </section>
 
-  <section id="demo">
+  <section id="demo" class="reveal">
     <div class="wrap">
       <div class="section-head">
         <h2>Play with it</h2>
@@ -212,7 +233,17 @@
     </div>
   </section>
 
-  <section id="features">
+  <section id="why" class="reveal">
+    <div class="wrap">
+      <div class="section-head"><h2>Why this exists</h2></div>
+      <blockquote class="quote">Hand-editing a 30-second reel — picking the best seconds, cutting to a beat, adding text — easily takes an hour. I wanted a tool that gets a solid first draft in about two minutes.</blockquote>
+      <div class="prose">
+        <p>You drop in your clips and photos, pick a style, and the AI plans the edit — order, cuts, color, text. You stay in control: adjust anything, lock the cuts and texts that already work, and regenerate only what's left. The interesting part wasn't getting an AI to suggest an edit; it was drawing a hard line between <strong>what the AI is allowed to decide</strong> and <strong>what the code enforces regardless of what the AI proposes</strong> — the AI never writes a single ffmpeg command.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="reveal">
     <div class="wrap">
       <div class="section-head">
         <h2>What it does</h2>
@@ -239,7 +270,20 @@
     </div>
   </section>
 
-  <section id="role">
+  <section id="highlights" class="reveal">
+    <div class="wrap">
+      <div class="section-head"><h2>Highlights</h2></div>
+      <ul class="highlight-list">
+        <li><strong>"AI decides, code executes."</strong> Claude never touches ffmpeg — it returns a JSON edit plan validated against a strict schema (Pydantic) before any video command runs, so a bad or unexpected response gets rejected and retried once instead of executing anything unvalidated.</li>
+        <li><strong>Lock and regenerate, not start over.</strong> Lock any cut or text that already works and hit Regenerate — only the unlocked parts get reworked. Standing lock rules ("keep the opening 3s", "never touch this file") apply automatically on every pass instead of re-locking by hand each time.</li>
+        <li><strong>Beat tracking from scratch.</strong> Custom beat detection in plain numpy, no external library, finds the BPM and beat grid, so cuts and zoom punches can snap to the music while the original clip audio ducks automatically underneath.</li>
+        <li><strong>A robustness pass that actually tried to break it.</strong> A dedicated audit looked for what could crash the server or corrupt a project. One bad upload used to take the whole project down — fixed that and three other real bugs, each verified with an end-to-end test, not just "it ran."</li>
+        <li><strong>A full manual toolkit once the AI draft lands.</strong> Drag-trim, a split tool, per-clip speed, a waveform display, multi-select, free-drag text, and B-roll/picture-in-picture overlays — none of it calls the API, all of it is plain timeline editing.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="role" class="reveal">
     <div class="wrap">
       <div class="section-head"><h2>My role</h2></div>
       <div class="feature-grid">
@@ -264,6 +308,21 @@
         <span class="chip">Pydantic</span>
         <span class="chip">numpy (beat tracking)</span>
       </div>
+    </div>
+  </section>
+
+  <section id="limits" class="reveal">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Known limitations</h2>
+        <p>Said plainly, not hidden in fine print — part of being honest about what shipped and what didn't.</p>
+      </div>
+      <ul class="limits">
+        <li><strong>The AI only sees 4 frames per clip.</strong> It picks well on calm footage but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.</li>
+        <li><strong>Beat tracking is tested on synthetic tracks</strong> (128 and 95 BPM, ~22ms error). On music without a clear drum hit it can get it wrong — turn off "On beat" for that track.</li>
+        <li><strong>No automated test suite yet.</strong> Every stage is tested by hand instead — thorough, but it doesn't scale the way an automated suite would.</li>
+        <li><strong>Whisper subtitles and the DaVinci export are implemented but untested on a normal install.</strong> The model download was blocked in the sandboxed environment this was built in — the logic was verified with a simulated transcript and validated against OpenTimelineIO, but neither has run for real yet.</li>
+      </ul>
     </div>
   </section>
 </main>
@@ -399,6 +458,27 @@ function renderPlan(key){
 
 renderMaterial();
 renderPlan("travel_story");
+
+// Subtle scroll-reveal for each section - fade up into view once, same pattern as the portfolio
+// site (visible-by-default if JS doesn't run or IntersectionObserver is missing, plus a safety
+// timeout so nothing can get permanently stuck invisible). Respects prefers-reduced-motion via CSS.
+(function () {
+  const els = document.querySelectorAll(".reveal");
+  if (!("IntersectionObserver" in window)) {
+    els.forEach((el) => el.classList.add("is-visible"));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("is-visible");
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  els.forEach((el) => io.observe(el));
+  setTimeout(() => els.forEach((el) => el.classList.add("is-visible")), 2000);
+})();
 </script>
 </body>
 </html>
