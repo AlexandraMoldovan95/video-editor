@@ -37,12 +37,25 @@ class TextItem(BaseModel):
     y: float | None = Field(None, ge=0.0, le=1.0)   # same, fraction of height. Either set -> overrides `position`.
     style: Literal["title", "caption", "cta", "subtitle"] = "caption"   # subtitle = generated from Whisper
     locked: bool = False
+    # alternate wordings for this same text (typically the opening hook): the UI lets the user flip
+    # `content` between these without a second AI call. Not hook-specific by design - any text item
+    # can carry variants, though the AI is only prompted to propose them for the opening title text.
+    variants: list[str] = Field(default_factory=list, max_length=2)
+    reason: str | None = Field(None, max_length=200)   # AI-only: one short sentence on why this text/wording/placement
 
     @model_validator(mode="after")
     def _times(self):
         if self.end - self.start < 0.5:
             raise ValueError(f"the text '{self.content}' must stay on screen for at least 0.5s")
         return self
+
+    @field_validator("variants")
+    @classmethod
+    def _variant_length(cls, v: list[str]) -> list[str]:
+        for s in v:
+            if not (1 <= len(s) <= 80):
+                raise ValueError("each text variant must be 1-80 characters")
+        return v
 
 
 class Clip(BaseModel):
@@ -65,6 +78,16 @@ class Clip(BaseModel):
     pan_y: float = Field(0.0, ge=-1.0, le=1.0)    # same, vertically: -1 full top, 1 full bottom
     locked: bool = False   # locked by the user: the AI won't change it on regeneration
     transition_in: Transition | None = None   # the transition FROM the previous clip INTO this one
+    reason: str | None = Field(None, max_length=200)   # AI-only: one short sentence on why THIS clip/cut/position
+    low_confidence: bool = False   # AI-only: true if the AI wasn't sure about this cut (fast/action-heavy, hard to judge from frames)
+    # J/L cuts: this clip's OWN sound (not music/sfx) can start before or keep playing after its own
+    # video - "borrowed" from the neighboring clip's on-screen time. audio_lead = seconds this clip's
+    # audio starts EARLY (plays under the END of the PREVIOUS clip's picture - a "J-cut"). audio_lag =
+    # seconds this clip's audio keeps going AFTER its own picture ends (plays under the START of the
+    # NEXT clip's picture - an "L-cut"). Both clamped at render/validation time to whatever room the
+    # neighboring clip and the source file actually have; video clips only (video has_audio).
+    audio_lead: float = Field(0.0, ge=0.0, le=5.0)
+    audio_lag: float = Field(0.0, ge=0.0, le=5.0)
 
     model_config = {"populate_by_name": True}
 
@@ -88,11 +111,56 @@ class Clip(BaseModel):
             raise ValueError("pan_x/pan_y only apply to fit='crop_center' (blur_pad shows the whole frame)")
         return self
 
+    @model_validator(mode="after")
+    def _audio_trim_needs_video(self):
+        if self.in_ is None and (self.audio_lead != 0.0 or self.audio_lag != 0.0):
+            raise ValueError("audio_lead/audio_lag only apply to video clips, not photos")
+        return self
+
+
+SfxName = Literal["whoosh", "ding", "impact", "pop", "click"]
+
+
+class SfxCue(BaseModel):
+    name: SfxName
+    start: float = Field(ge=0)
+    volume: float = Field(1.0, ge=0.0, le=3.0)
+
+
+OverlayMode = Literal["pip_tl", "pip_tr", "pip_bl", "pip_br", "split_left", "split_right"]
+
+
+class OverlayItem(BaseModel):
+    """A second video/photo layer composited on TOP of the main timeline for a time window -
+    B-roll-in-a-corner (PIP) or a side-by-side (split-screen). Manual-only for now (never produced
+    by the AI planner): added, moved and removed by hand in the UI. Always muted - this is a
+    picture-only layer, the main timeline's own audio (+ music/sfx) keeps playing underneath
+    unchanged, so there's never a surprise second audio source to untangle."""
+    source: str
+    in_: float | None = Field(None, alias="in", ge=0)   # video
+    out: float | None = Field(None, ge=0)
+    duration: float | None = Field(None, ge=0.3, le=20.0)   # photo
+    start: float = Field(ge=0)   # absolute position on the MAIN timeline (on-screen seconds)
+    mode: OverlayMode = "pip_br"
+    scale: float = Field(0.35, ge=0.15, le=0.6)   # PIP only (fraction of frame width); ignored for split_*
+    locked: bool = False
+
+    model_config = {"populate_by_name": True}
+
+    @field_validator("source")
+    @classmethod
+    def only_filename(cls, v: str) -> str:
+        if Path(v).name != v or v.startswith("."):
+            raise ValueError(f"source must be a filename only: {v!r}")
+        return v
+
 
 class EDL(BaseModel):
     output: Output = Output()
     clips: list[Clip] = Field(min_length=1, max_length=60)
     texts: list[TextItem] = Field(default_factory=list, max_length=12)
+    sfx: list[SfxCue] = Field(default_factory=list, max_length=30)
+    overlays: list[OverlayItem] = Field(default_factory=list, max_length=20)
 
 
 def validate_edl(raw: dict, media: dict[str, MediaInfo]) -> EDL:
@@ -114,9 +182,25 @@ def validate_edl(raw: dict, media: dict[str, MediaInfo]) -> EDL:
         else:
             if c.duration is None:
                 c.duration = 2.5
-    errors += overlap_errors(edl) + transition_errors(edl) + text_errors(edl)
+    for i, o in enumerate(edl.overlays):
+        info = media.get(o.source)
+        if info is None:
+            errors.append(f"overlay {i}: file does not exist {o.source!r}")
+            continue
+        if info.kind == "video":
+            if o.in_ is None or o.out is None:
+                errors.append(f"overlay {i}: video without 'in'/'out'")
+            elif not (o.in_ < o.out <= info.duration + 0.05):
+                errors.append(f"overlay {i}: invalid interval {o.in_}-{o.out} (duration {info.duration:.2f}s)")
+            elif o.out - o.in_ < 0.3:
+                errors.append(f"overlay {i}: too short (<0.3s)")
+        else:
+            if o.duration is None:
+                o.duration = 2.5
+    errors += overlap_errors(edl) + transition_errors(edl) + text_errors(edl) + sfx_errors(edl) + overlay_errors(edl)
     if errors:
         raise ValueError("Invalid EDL:\n  " + "\n  ".join(errors))
+    clamp_audio_trim(edl)
     return edl
 
 
@@ -187,6 +271,40 @@ def text_errors(edl: EDL) -> list[str]:
     return errs
 
 
+def sfx_errors(edl: EDL) -> list[str]:
+    total = total_duration(edl)
+    errs = []
+    for s in edl.sfx:
+        if s.start >= total - 0.05:
+            errs.append(f"the {s.name!r} sound effect starts after the end of the video ({total:.1f}s)")
+    return errs
+
+
+def overlay_duration(o: OverlayItem) -> float:
+    if o.in_ is not None:
+        return o.out - o.in_
+    return o.duration or 2.5
+
+
+def overlay_errors(edl: EDL) -> list[str]:
+    """Same spirit as text_errors: a window that starts past the end is a real error, one that only
+    runs a bit past the end is silently trimmed to fit (no need to bother the user over a rounding
+    edge from a clip they just shortened)."""
+    total = total_duration(edl)
+    errs = []
+    for o in edl.overlays:
+        if o.start >= total - 0.3:
+            errs.append(f"the overlay {o.source!r} starts after the end of the video ({total:.1f}s)")
+            continue
+        over = o.start + overlay_duration(o) - total
+        if over > 0:
+            if o.in_ is not None:
+                o.out = round(o.out - over, 2)
+            else:
+                o.duration = round((o.duration or 2.5) - over, 2)
+    return errs
+
+
 def clamp_transitions(edl: EDL) -> EDL:
     """After durations change (beat alignment), shorten transitions that no longer fit."""
     for i in range(1, len(edl.clips)):
@@ -197,4 +315,20 @@ def clamp_transitions(edl: EDL) -> EDL:
                 tr.duration = round(max(0.15, lim), 2)
                 if tr.duration > lim:          # the clip is too short even for 0.15s
                     edl.clips[i].transition_in = None
+    return edl
+
+
+def clamp_audio_trim(edl: EDL) -> EDL:
+    """J/L cuts (Clip.audio_lead/audio_lag) can only borrow as much on-screen time as the
+    neighboring clip actually has - and the first/last clip has no neighbor to borrow from at all.
+    This is the structural cap (doesn't need the source file); render.py applies a second,
+    tighter clamp against how much RAW source footage is actually available to extend into."""
+    clips = edl.clips
+    for i, c in enumerate(clips):
+        if c.audio_lead:
+            cap = clip_duration(clips[i - 1]) if i > 0 else 0.0
+            c.audio_lead = round(min(c.audio_lead, cap), 2)
+        if c.audio_lag:
+            cap = clip_duration(clips[i + 1]) if i + 1 < len(clips) else 0.0
+            c.audio_lag = round(min(c.audio_lag, cap), 2)
     return edl

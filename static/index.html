@@ -58,13 +58,16 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .hint{color:var(--muted);font-size:12px;line-height:1.4}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
-.tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:pointer;min-width:6px;background-size:cover;background-position:center;position:relative}
+.tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:grab;min-width:6px;background-size:cover;background-position:center;position:relative;touch-action:none}
+.tl div.dragging{opacity:.5;cursor:grabbing;z-index:4;outline:2px dashed var(--acc);outline-offset:-2px}
 .tl div.sel{outline:2px solid var(--acc);outline-offset:-2px}
 .tl div.multisel{outline:2px dashed var(--ok);outline-offset:-2px}
 .tl div.multisel.sel{outline:2px solid var(--acc)}
 .clip.multisel{border-color:var(--ok)}
 .bulkbar{background:var(--panel2);border-radius:7px;padding:6px 8px;margin:4px 0}
 .tl div span{background:#000a;padding:0 3px;border-radius:3px;pointer-events:none;position:relative;z-index:1}
+.tl div .filmstrip{position:absolute;inset:0;display:flex;z-index:0;pointer-events:none;overflow:hidden}
+.tl div .filmstrip img{flex:1;min-width:0;height:100%;object-fit:cover;display:block}
 .tl div .wave{position:absolute;inset:0;display:flex;align-items:flex-end;gap:0;opacity:.55;pointer-events:none;z-index:0}
 .tl div .wave i{flex:1;background:#fff;min-height:2px;min-width:1px}
 .tl div .trim{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2;touch-action:none}
@@ -89,6 +92,7 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .clip .det{grid-column:2/5}
 .lockbtn.on{background:var(--lock);border-color:var(--lock);color:#0a1330}
 .reason{background:var(--panel2);border-left:3px solid var(--acc);padding:10px 12px;border-radius:6px;line-height:1.45;margin-bottom:10px}
+.itemreason{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-style:italic;opacity:.85}
 .status{font-size:12.5px;padding:8px 10px;border-radius:7px;background:var(--panel2);margin-top:8px}
 .status.err{color:var(--err)}.status.ok{color:var(--ok)}
 .preview video{width:100%;aspect-ratio:9/16;background:#000;border-radius:8px}
@@ -106,12 +110,16 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .trk div{position:absolute;top:2px;bottom:2px;border-radius:4px;font-size:10px;color:#fff;padding:0 4px;overflow:hidden;white-space:nowrap;cursor:pointer;line-height:14px}
 .trk .title{background:#7a5cff}.trk .subtitle{background:#0e7490;opacity:.85}.trk .caption{background:#4b5563}.trk .cta{background:var(--acc);color:#1a0d06}
 .trk div.locked{outline:1.5px solid var(--lock)}
+.trk.sfxtrk{height:16px}
+.trk.sfxtrk div{top:1px;bottom:1px;width:16px;padding:0;border-radius:50%;text-align:center;background:#d97706;font-weight:700}
 .txt{display:grid;grid-template-columns:1fr auto;gap:6px 10px;background:var(--panel2);border:1.5px solid transparent;border-radius:8px;padding:8px;margin-bottom:6px}
 .txt.locked{border-color:var(--lock)}
 .txt input[type=text]{width:100%}
 .txt .row input[type=number]{width:64px}
 .trb{font-size:10.5px;color:var(--acc2)}
 .tl div.hastr::before{content:'';position:absolute;left:-5px;top:4px;bottom:4px;width:9px;background:linear-gradient(90deg,transparent,#fff8,transparent);z-index:1}
+.tl div.lowconf{box-shadow:inset 0 0 0 2px var(--warn)}
+.tl div.lowconf::after{content:'⚠';position:absolute;top:1px;right:3px;font-size:11px;z-index:2;text-shadow:0 0 2px #000,0 0 2px #000}
 .empty{color:var(--muted);text-align:center;padding:30px 10px}
 .total{font-variant-numeric:tabular-nums}
 .total.off{color:var(--warn)}
@@ -119,6 +127,22 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .showAdv .adv{display:block}
 .advToggleRow{margin-top:8px}
 @media (max-width:1100px){.layout{grid-template-columns:1fr;height:auto}.col{max-height:none}}
+button.ghost{background:transparent;border-color:var(--line)}
+.modalBack{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
+.modalBack[hidden]{display:none}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;width:min(460px,90vw);max-height:80vh;overflow:auto}
+.variantCard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.variantCard.err{border-color:var(--err)}
+.featRow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.featRow:first-of-type{border-top:none}
+.featRow input{margin-top:3px}
+.featRow .ft{font-size:13px}
+.featRow .fd{color:var(--muted);font-size:12px;margin-top:1px}
+.ctxMenu{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:4px;box-shadow:0 4px 18px #0008;z-index:60;min-width:160px}
+.ctxMenu button{display:block;width:100%;text-align:left;background:transparent;border:none;padding:7px 10px;border-radius:5px;font-size:12.5px}
+.ctxMenu button:hover{background:var(--panel2)}
+.ctxMenu button.danger{color:var(--err)}
+.ctxMenu hr{border:none;border-top:1px solid var(--line);margin:4px 0}
 </style>
 </head>
 <body>
@@ -128,7 +152,44 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
   <button id="newProj">+ New project</button>
   <div class="sp"></div>
   <span class="hint" id="usage"></span>
+  <button class="small ghost" id="settingsBtn" title="Show or hide feature groups">⚙ Settings</button>
 </header>
+
+<div id="settingsModal" class="modalBack" hidden>
+  <div class="modal">
+    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Settings</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="settingsClose">✕</button></div>
+    <div class="hint" style="margin-bottom:10px">Turn off whatever you don't use — the app gets out of the way instead of showing everything at once. Nothing you've already set up is deleted, it's just hidden.</div>
+    <div id="settingsList"></div>
+  </div>
+</div>
+
+<div id="savePresetModal" class="modalBack" hidden>
+  <div class="modal" style="width:min(360px,90vw)">
+    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Save as preset</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="savePresetClose">✕</button></div>
+    <div class="hint" style="margin-bottom:10px">Saves the preset you have selected plus any field you've changed, as one new preset you can pick again later - for this app, on this computer.</div>
+    <input type="text" id="savePresetName" placeholder="Name (e.g. My reel style)" maxlength="60" style="width:100%">
+    <div class="row" style="margin-top:10px;justify-content:flex-end">
+      <button class="primary" id="savePresetConfirm">Save</button>
+    </div>
+    <div class="status" id="savePresetMsg" hidden></div>
+  </div>
+</div>
+
+<div id="swapModal" class="modalBack" hidden>
+  <div class="modal" style="width:min(560px,92vw)">
+    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Swap source</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="swapClose">✕</button></div>
+    <div class="hint" style="margin-bottom:10px">Pick a replacement file. This clip's position, color, lock and any text synced to it stay put - only the footage and its in/out (or photo duration) change.</div>
+    <div class="grid" id="swapGrid" style="grid-template-columns:1fr 1fr 1fr"></div>
+  </div>
+</div>
+
+<div id="variantsModal" class="modalBack" hidden>
+  <div class="modal" style="width:min(760px,94vw)">
+    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Pick a draft</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="variantsClose">✕</button></div>
+    <div class="hint" style="margin-bottom:10px">2-3 structurally different takes on the same material. Pick one to use as your plan - you can still edit and regenerate from there.</div>
+    <div id="variantsList"></div>
+  </div>
+</div>
 
 <div class="layout">
   <!-- ======== MATERIAL ======== -->
@@ -143,7 +204,7 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 
       <div class="panel" id="trPanel" hidden></div>
 
-      <div class="panel">
+      <div class="panel" id="exPanel">
         <h3>Example video <span class="hint">(optional — pace + style)</span></h3>
         <div class="row">
           <span id="exName" class="hint">none</span>
@@ -165,6 +226,18 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
         <input type="file" id="muIn" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" hidden>
         <div id="muBody" hidden></div>
       </div>
+
+      <div class="panel" id="ambPanel">
+        <h3>Ambience <span class="hint">(optional - a second, quieter layer under the music: room tone, rain, crowd…)</span></h3>
+        <div class="row">
+          <span id="amName" class="hint">no track</span>
+          <div style="flex:1"></div>
+          <button class="small" id="amBtn">Choose</button>
+          <button class="small" id="amDel" hidden>Delete</button>
+        </div>
+        <input type="file" id="amIn" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" hidden>
+        <div id="amBody" hidden></div>
+      </div>
     </div>
   </section>
 
@@ -182,9 +255,20 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
           <label class="hint">Preset</label>
           <select id="preset"></select>
           <span class="hint">fields you change take priority</span>
+          <div class="sp" style="flex:1"></div>
+          <button class="small ghost" id="presetSaveBtn" title="Save the current preset + your field changes under a new name">💾 Save as…</button>
+          <button class="small ghost" id="presetDelBtn" title="Delete this custom preset" hidden>🗑 Delete preset</button>
         </div>
         <div class="row">
-          <div class="field"><label>Target duration</label><select id="f_target_duration"><option>15</option><option>30</option><option>45</option><option>60</option></select></div>
+          <div class="field"><label>Target duration (s)</label>
+            <input type="number" id="f_target_duration" min="5" max="120" step="1">
+            <span class="row" style="gap:3px;margin-top:3px">
+              <button type="button" class="small ghost durQ" data-s="15" style="padding:2px 6px">15</button>
+              <button type="button" class="small ghost durQ" data-s="30" style="padding:2px 6px">30</button>
+              <button type="button" class="small ghost durQ" data-s="45" style="padding:2px 6px">45</button>
+              <button type="button" class="small ghost durQ" data-s="60" style="padding:2px 6px">60</button>
+            </span>
+          </div>
           <div class="field"><label>Pace</label><select id="f_pace"><option>slow</option><option>medium</option><option>fast</option></select></div>
           <div class="field"><label>Color look</label><select id="f_color_look"><option>neutral</option><option>warm</option><option>cool</option><option>contrast</option><option>pastel</option></select></div>
           <div class="field"><label>Vertical fit</label><select id="f_vertical_fit"><option value="crop_center">center crop</option><option value="blur_pad">blurred background</option></select></div>
@@ -196,8 +280,34 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
         <div class="row" style="margin-top:8px">
           <button class="primary" id="planBtn">Generate plan</button>
           <span class="hint" id="planHint"></span>
+          <button class="small ghost" id="variantsBtn" title="Generate 2-3 structurally different drafts in one pass and pick your favorite">🎲 3 variants</button>
         </div>
         <div class="status" id="planStatus" hidden></div>
+      </div>
+
+      <div class="panel" id="lockRulesPanel">
+        <h3>Lock rules <span class="hint">(optional - auto-locks matching clips on every regenerate, instead of locking them one by one)</span></h3>
+        <div id="lockRulesList" class="hint">No rules yet.</div>
+        <div class="row" style="margin-top:8px;gap:6px">
+          <span class="hint">Keep the opening</span>
+          <input type="number" id="lrSeconds" min="0.5" max="600" step="0.5" value="3" style="width:70px">
+          <span class="hint">s</span>
+          <button class="small" id="lrAddOpening">+ Add</button>
+          <div class="sp" style="flex:1"></div>
+          <span class="hint">Never touch clips from</span>
+          <select id="lrSource"></select>
+          <button class="small" id="lrAddSource">+ Add</button>
+        </div>
+      </div>
+
+      <div class="panel" id="overlaysPanel">
+        <h3>B-roll / PIP <span class="hint">(optional - a second video layer over a time window: picture-in-picture in a corner, or side-by-side split-screen. Manual only, always muted - the main audio keeps playing underneath.)</span></h3>
+        <div id="overlaysList" class="hint">No overlays yet.</div>
+        <div class="row" style="margin-top:8px;gap:6px">
+          <span class="hint">Add from</span>
+          <select id="ovSource"></select>
+          <button class="small" id="ovAdd">+ Add overlay</button>
+        </div>
       </div>
 
       <div id="planArea" style="margin-top:12px"></div>
@@ -212,15 +322,20 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
       <div class="row" style="margin-top:10px">
         <button class="primary" id="draftBtn">Render draft</button>
         <button id="finalBtn">Render final</button>
+        <button id="previewBtn" title="Fast, cached, low-res preview - only clips you actually changed since the last preview get re-encoded">⚡ Quick preview</button>
       </div>
+      <label class="row hint" id="autoPreviewRow" style="margin-top:4px;cursor:pointer">
+        <input type="checkbox" id="autoPreviewChk"> Auto-preview after each edit
+      </label>
+      <div class="status" id="previewStatus" hidden></div>
       <label class="row hint" id="muteRow" style="margin-top:8px;cursor:pointer" hidden>
         <input type="checkbox" id="muteChk"> Export without music
       </label>
       <div class="hint" id="muteHint" hidden style="margin-top:2px">Cuts stay on the track's beat. For TikTok/Reels: add the same track from within the app (licensed, no mute/claim).</div>
-      <div class="hint" style="margin-top:6px">Draft = 540×960, fast. Final = 1080×1920.</div>
+      <div class="hint" style="margin-top:6px">Quick preview = ~270×480, cached, fast to iterate with. Draft = 540×960. Final = 1080×1920.</div>
       <div class="status" id="renderStatus" hidden></div>
       <div class="row" style="margin-top:8px"><a id="dl" class="hint" hidden download>⬇ Download</a></div>
-      <div class="panel">
+      <div class="panel" id="davinciPanel">
         <h3>Continue in DaVinci Resolve</h3>
         <div class="hint">Editable timeline with the <b>original</b> files: order, cuts, framing, transitions (as Cross Dissolve), volume, music, texts.
         <br><b>Not transferred:</b> color grading (redo it in the Color page), photo zoom, blurred background, text styling, ducking.
@@ -247,6 +362,85 @@ const debounce = (fn, ms) => {
 };
 const fmt = n => (Math.round(n * 100) / 100).toString();
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// ---------------- settings: global feature toggles, so the UI shows only what you actually use ----------------
+// Stored in localStorage (not per-project): this is a declutter preference about YOU as an editor,
+// not about any one project. Turning a feature off only hides its UI - nothing it already holds
+// (a chosen track, a transcript, a clip's speed/color) is touched or lost; turn it back on and it's
+// all still there.
+const FEATURE_LABELS = {
+  advancedClip: ['Advanced per-clip editing', 'Speed, manual reframe, color grading and volume controls on each clip and file.'],
+  music: ['Music & beat sync', 'The music panel, track upload and beat-aligned cutting.'],
+  example: ['Example-video style match', 'Upload a reference video to match its cut pace.'],
+  whisper: ['Speech transcription & subtitles', 'Whisper transcription and auto-generated subtitles.'],
+  demo: ['Demo presets', 'The no-API-key example plans for the sample clips.'],
+  davinci: ['DaVinci Resolve / FCPXML export', 'Exporting an editable timeline for DaVinci Resolve or Final Cut.'],
+  sfx: ['SFX & ambience track', 'A small sound-effect library (whoosh, ding, impact…) plus a second background audio layer under the music.'],
+  deepScan: ['Deep scan a clip', 'A "🔍 Deep scan" button on each video clip that re-examines it with 20 frames instead of 4 and refines the exact cut - useful for fast or action-heavy footage.'],
+  lockRules: ['Lock rules', 'Standing rules ("keep the opening 3s", "never touch clips from file X") that auto-lock matching clips on every regenerate, instead of locking them one by one.'],
+  planVariants: ['Multiple draft variants', 'A "🎲 3 variants" button that generates 2-3 structurally different drafts in one pass, so you can pick your favorite instead of only ever seeing one.'],
+  overlays: ['B-roll / PIP / split-screen', 'A second video layer you place by hand: picture-in-picture in a corner, or a side-by-side split-screen, over any time window of the main timeline. Manual only - the AI never adds these on its own.'],
+  quickPreview: ['Quick preview', 'A "⚡ Quick preview" button for a fast, low-res, cached preview - only the clips you actually changed get re-encoded, so it\'s much faster than Render draft once you\'ve previewed once. Optional auto-preview after each edit.'],
+};
+const DEFAULT_FEATURES = Object.fromEntries(Object.keys(FEATURE_LABELS).map(k => [k, true]));
+function loadFeatures() {
+  try { return {...DEFAULT_FEATURES, ...JSON.parse(localStorage.getItem('features') || '{}')} }
+  catch { return {...DEFAULT_FEATURES} }
+}
+let FEATURES = loadFeatures();
+function saveFeatures() { try { localStorage.setItem('features', JSON.stringify(FEATURES)) } catch {} }
+function renderSettingsModal() {
+  $('#settingsList').innerHTML = Object.entries(FEATURE_LABELS).map(([k, [title, desc]]) => `
+    <label class="featRow">
+      <input type="checkbox" data-feat="${k}" ${FEATURES[k] ? 'checked' : ''}>
+      <span><div class="ft">${esc(title)}</div><div class="fd">${esc(desc)}</div></span>
+    </label>`).join('');
+  $('#settingsList').querySelectorAll('[data-feat]').forEach(cb => cb.onchange = () => {
+    FEATURES[cb.dataset.feat] = cb.checked;
+    saveFeatures();
+    applyFeatureVisibility();
+  });
+}
+function applyFeatureVisibility() {
+  // panels that are plain static HTML (not re-rendered from JS each time) - just show/hide them
+  if ($('#musicPanel')) $('#musicPanel').style.display = FEATURES.music ? '' : 'none';
+  if ($('#ambPanel')) $('#ambPanel').style.display = FEATURES.sfx ? '' : 'none';
+  if ($('#exPanel')) $('#exPanel').style.display = FEATURES.example ? '' : 'none';
+  if ($('#davinciPanel')) $('#davinciPanel').style.display = FEATURES.davinci ? '' : 'none';
+  if ($('#lockRulesPanel')) $('#lockRulesPanel').style.display = FEATURES.lockRules ? '' : 'none';
+  if ($('#overlaysPanel')) $('#overlaysPanel').style.display = FEATURES.overlays ? '' : 'none';
+  if ($('#previewBtn')) $('#previewBtn').style.display = FEATURES.quickPreview ? '' : 'none';
+  if ($('#autoPreviewRow')) $('#autoPreviewRow').style.display = FEATURES.quickPreview ? '' : 'none';
+  if ($('#variantsBtn')) $('#variantsBtn').style.display = FEATURES.planVariants ? '' : 'none';
+  if ($('#demoPanel')) $('#demoPanel').hidden = !FEATURES.demo || !DEMOS.length;
+  // panels whose own render function already decides `hidden` from other state (audio clips
+  // present, etc.) - just re-run them so the feature flag gets folded into that same check
+  if (P) { renderTranscripts(); renderDemoBtns(); renderPlan(); renderHint(); renderLockRules(); renderOverlays(); }
+}
+$('#settingsBtn').onclick = () => { renderSettingsModal(); $('#settingsModal').hidden = false };
+$('#settingsClose').onclick = () => { $('#settingsModal').hidden = true };
+$('#settingsModal').onclick = e => { if (e.target.id === 'settingsModal') $('#settingsModal').hidden = true };
+// ---------------- units: every slider/number value shown in the UI gets a consistent suffix ----------------
+// FIELD_UNITS: the symbol shown right after the number. FIELD_MULT: multiply the raw value before showing it
+// (e.g. volume is stored as a 0-2 multiplier but shown as 0-200%). FIELD_DESC: hover tooltip on the label
+// explaining what the number means and its range, for values that aren't self-explanatory.
+const FIELD_UNITS = {speed: '×', volume: '%', contrast: '×', saturation: '×', brightness: '', warmth: '', fade_in: 's', fade_out: 's', audio_lead: 's', audio_lag: 's', punch_amount: '%'};
+const FIELD_MULT = {volume: 100, punch_amount: 100};
+const unitOf = f => FIELD_UNITS[f] ?? '';
+const multOf = f => FIELD_MULT[f] ?? 1;
+const FIELD_SIGNED = new Set(['brightness', 'warmth']);   // these are offsets around 0, not multipliers - show the sign explicitly
+const fmtUnit = (f, v) => { const n = v * multOf(f); return (FIELD_SIGNED.has(f) && n > 0 ? '+' : '') + fmt(n) + unitOf(f) };
+const FIELD_DESC = {
+  brightness: 'Exposure shift: 0 = unchanged, negative = darker, positive = brighter (range ±0.3)',
+  contrast: 'Contrast multiplier: 1× = unchanged, below = flatter image, above = more contrast (range 0.5×–2×)',
+  saturation: 'Color intensity multiplier: 1× = unchanged, 0× = grayscale, above = more vivid colors (range 0×–3×)',
+  warmth: 'Color temperature shift: 0 = unchanged, negative = cooler/blue tint, positive = warmer/orange tint (range ±0.2)',
+  speed: 'Playback speed multiplier: 1× = normal speed, below = slow motion, above = timelapse (range 0.25×–4×)',
+  volume: 'Volume as a % of the clip’s original audio: 100% = unchanged, 0% = muted, 200% = double volume',
+  audio_lead: 'J-cut: this clip’s own sound starts this many seconds BEFORE its picture does, playing under the end of the previous clip. Capped by how much room the previous clip and the source file actually have.',
+  audio_lag: 'L-cut: this clip’s own sound keeps playing this many seconds AFTER its picture ends, under the start of the next clip. Capped by how much room the next clip and the source file actually have.',
+  punch: 'B1: a quick whole-frame zoom pulse timed to the music\'s beat - needs "On beat" / a detected tempo to work from.',
+  punch_amount: 'How strong each zoom pulse is: 0% = off, bigger = a more aggressive snap. Keep it subtle (a few %) unless you want a very punchy edit.',
+};
 function bindAdvToggle(container) {
   const btn = container.querySelector('[data-advtoggle]');
   if (!btn) return;
@@ -259,6 +453,7 @@ function bindAdvToggle(container) {
 let CFG, DEMOS = [], P = null, selFile = null, selClip = null;
 let EDL_HISTORY = [], EDL_FUTURE = [];   // undo/redo over P.edl (manual edits only — see snapshotEdl)
 let MULTI_SEL = new Set(), MULTI_ANCHOR = null;   // bulk clip selection on the timeline (shift/ctrl-click)
+let SUPPRESS_TL_CLICK = false;   // set right before a timeline reorder-drag re-renders, so the trailing native click (on the now-stale element) is a no-op
 
 // ---------------- undo / redo ----------------
 function snapshotEdl() {
@@ -293,10 +488,15 @@ const mediaOf = n => P.media.find(m => m.name === n);
 
 // ---------------- projects ----------------
 async function init() {
+  // was 4 of applyFeatureVisibility()'s lines duplicated here, by themselves - which also meant every
+  // OTHER toggle (lock rules, overlays, quick preview, variants...) stayed visible on a fresh page
+  // load no matter what was saved, only correcting itself once Settings was opened and touched. One
+  // call here covers all of them consistently.
+  applyFeatureVisibility();
   CFG = await api('/api/config');
-  $('#preset').innerHTML = Object.keys(CFG.presets).map(k => `<option>${k}</option>`).join('');
+  renderPresetOptions();
   try { DEMOS = await api('/api/demo') } catch { DEMOS = [] }
-  $('#demoPanel').hidden = !DEMOS.length;
+  $('#demoPanel').hidden = !FEATURES.demo || !DEMOS.length;
   let list = await api('/api/projects');
   if (!list.length) { await api('/api/projects', {method: 'POST'}); list = await api('/api/projects') }
   fillProjects(list);
@@ -311,8 +511,8 @@ async function loadProject(id) {
   P = await api(`/api/projects/${id}`);
   localStorageSet('proj', id);
   $('#projSel').value = id;
-  selFile = null; selClip = null; clearHistory(); WAVEFORMS = {};
-  renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderPlan(); renderDemoBtns();
+  selFile = null; selClip = null; clearHistory(); WAVEFORMS = {}; FILMSTRIPS = {};
+  renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderAmbience(); renderLockRules(); renderOverlays(); renderPlan(); renderDemoBtns();
   $('#player').removeAttribute('src'); $('#dl').hidden = true;
 }
 async function refresh() { P = await api(`/api/projects/${P.id}`); }
@@ -330,7 +530,12 @@ async function upload(files) {
   if (!files.length) return;
   const fd = new FormData(); [...files].forEach(f => fd.append('files', f));
   drop.textContent = `Uploading ${files.length} file(s)…`;
-  try { await api(`/api/projects/${P.id}/upload`, {method: 'POST', body: fd}) }
+  try {
+    const r = await api(`/api/projects/${P.id}/upload`, {method: 'POST', body: fd});
+    if (r.rejected && r.rejected.length) {
+      alertStatus('#planStatus', `Could not use: ${r.rejected.join(', ')} (unsupported or corrupt file - removed)`, true);
+    }
+  }
   catch (e) { alertStatus('#planStatus', e.message, true) }
   drop.innerHTML = 'Drag videos and photos here<br><small>or click to choose</small>';
   await refresh(); renderGrid(); renderTranscripts(); renderDemoBtns(); fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
@@ -383,30 +588,31 @@ function renderHint() {
     ${m.kind === 'video' ? `<video id="hv" src="${src}" controls muted preload="metadata"></video>` : `<img src="${thumb(m.name)}" style="width:100%;border-radius:6px">`}
     <div class="field"><label>Usage</label>${segBtns('use', [['auto', 'auto'], ['must', 'required'], ['exclude', 'excluded']])}</div>
     ${m.kind === 'video' ? `
-      <div class="field"><label>Allowed range</label>
+      <div class="field"><label>Allowed range (s)</label>
         <input type="number" id="h_in" step="0.1" min="0" max="${m.duration}" value="${h.segment_in ?? ''}" placeholder="0">
         <span class="hint">–</span>
         <input type="number" id="h_out" step="0.1" min="0" max="${m.duration}" value="${h.segment_out ?? ''}" placeholder="${fmt(m.duration)}">
+        <span class="hint">s</span>
       </div>
       <div class="row" style="margin:-2px 0 6px 100px"><button class="small" id="setIn">start = now</button><button class="small" id="setOut">end = now</button><button class="small" id="clrSeg">clear</button></div>` : `
       <div class="field"><label>Duration (s)</label><input type="number" id="h_pd" step="0.1" min="2" max="4" value="${h.photo_duration ?? ''}" placeholder="auto"></div>
       <div class="field"><label>Motion</label>${segBtns('photo_motion', [['auto', 'auto'], ['zoom_in', 'zoom in'], ['zoom_out', 'zoom out'], ['static', 'static']])}</div>`}
     <div class="field"><label>Framing</label>${segBtns('fit', [['auto', 'auto'], ['crop_center', 'crop'], ['blur_pad', 'blurred']])}</div>
-    <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
+    ${FEATURES.advancedClip ? `<div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
     <div class="adv">
-      ${m.has_audio ? `<div class="field"><label>Fix volume</label><input type="checkbox" id="h_vl" ${h.volume != null ? 'checked' : ''}>
-        <input type="range" id="h_vol" min="0" max="2" step="0.05" value="${h.volume ?? 1}" ${h.volume != null ? '' : 'disabled'}><span class="v">${fmt(h.volume ?? 1)}</span></div>` : ''}
+      ${m.has_audio ? `<div class="field"><label title="${FIELD_DESC.volume}">Fix volume (%)</label><input type="checkbox" id="h_vl" ${h.volume != null ? 'checked' : ''}>
+        <input type="range" id="h_vol" min="0" max="2" step="0.05" value="${h.volume ?? 1}" ${h.volume != null ? '' : 'disabled'}><span class="v">${fmtUnit('volume', h.volume ?? 1)}</span></div>` : ''}
       <div class="field"><label>Fix color</label><input type="checkbox" id="h_cl" ${h.color ? 'checked' : ''}></div>
       <div id="h_colors" ${h.color ? '' : 'hidden'}>${COLOR_KEYS.map(([k, l, mn, mx, st]) => {
         const v = h.color ? h.color[k] : (k === 'contrast' || k === 'saturation' ? 1 : 0);
-        return `<div class="field"><label>${l}</label><input type="range" data-ck="${k}" min="${mn}" max="${mx}" step="${st}" value="${v}"><span class="v">${fmt(v)}</span></div>`
+        return `<div class="field"><label title="${FIELD_DESC[k] || ''}">${l}</label><input type="range" data-ck="${k}" min="${mn}" max="${mx}" step="${st}" value="${v}"><span class="v">${fmtUnit(k, v)}</span></div>`
       }).join('')}</div>
-      <div class="field" style="align-items:flex-start"><label>Note for AI</label><textarea id="h_note" placeholder="e.g. the good moment is the jump at the end">${esc(h.note)}</textarea></div>
-    </div>
+    </div>` : ''}
+    <div class="field" style="align-items:flex-start"><label>Note for AI</label><textarea id="h_note" placeholder="e.g. the good moment is the jump at the end">${esc(h.note)}</textarea></div>
     <div class="row"><button class="small" id="h_reset">Reset</button><button class="small" id="h_del" style="color:var(--err)">Remove file</button><span class="hint" id="h_saved"></span></div>`;
 
   const save = debounce(async () => {
-    const color = $('#h_cl').checked ? Object.fromEntries([...panel.querySelectorAll('[data-ck]')].map(i => [i.dataset.ck, +i.value])) : null;
+    const color = $('#h_cl')?.checked ? Object.fromEntries([...panel.querySelectorAll('[data-ck]')].map(i => [i.dataset.ck, +i.value])) : null;
     const num = id => { const el = $(id); return el && el.value !== '' ? +el.value : null };
     const hint = {
       use: panel.querySelector('[data-k=use] .on').dataset.v,
@@ -425,10 +631,10 @@ function renderHint() {
 
   panel.querySelectorAll('.seg button').forEach(b => b.onclick = () => { b.parentNode.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); save() });
   panel.querySelectorAll('input,textarea').forEach(i => i.addEventListener('input', () => {
-    if (i.dataset.ck) i.nextElementSibling.textContent = fmt(+i.value);
+    if (i.dataset.ck) i.nextElementSibling.textContent = fmtUnit(i.dataset.ck, +i.value);
     if (i.id === 'h_cl') $('#h_colors').hidden = !i.checked;
     if (i.id === 'h_vl') $('#h_vol').disabled = !i.checked;
-    if (i.id === 'h_vol') i.nextElementSibling.textContent = fmt(+i.value);
+    if (i.id === 'h_vol') i.nextElementSibling.textContent = fmtUnit('volume', +i.value);
     save();
   }));
   bindAdvToggle(panel);
@@ -446,7 +652,7 @@ function renderHint() {
 function renderTranscripts() {
   const panel = $('#trPanel');
   const withAudio = P.media.filter(m => m.kind === 'video' && m.has_audio);
-  if (!withAudio.length) { panel.hidden = true; return }
+  if (!FEATURES.whisper || !withAudio.length) { panel.hidden = true; return }
   panel.hidden = false;
   const missing = withAudio.filter(m => !P.transcripts[m.name]).length;
   panel.innerHTML = `
@@ -490,20 +696,23 @@ function renderMusic() {
   $('#muName').innerHTML = `<b style="color:var(--text)">${esc(m.file)}</b> · ${m.bpm} BPM · ${fmt(m.duration)}s`;
   body.hidden = false;
   const target = +$('#f_target_duration').value;
-  const slider = (k, l, mn, mx, st) => `<div class="field"><label>${l}</label><input type="range" data-mk="${k}" min="${mn}" max="${mx}" step="${st}" value="${m[k]}"><span class="v">${fmt(m[k])}</span></div>`;
+  const slider = (k, l, mn, mx, st) => `<div class="field"><label title="${FIELD_DESC[k] || ''}">${l}</label><input type="range" data-mk="${k}" min="${mn}" max="${mx}" step="${st}" value="${m[k]}"><span class="v">${fmtUnit(k, m[k])}</span></div>`;
   const avail = m.duration - m.start;
   body.innerHTML = `
     <audio id="mu" src="/api/projects/${P.id}/music/file" controls preload="metadata"></audio>
     <div class="energy" id="muEnergy" title="Track energy per second — click to set the start point">${m.energy.map((e, i) =>
       `<div data-s="${i}" class="${i >= m.start && i < m.start + target ? 'in' : ''}" style="height:${Math.max(4, e * 100)}%"></div>`).join('')}</div>
     <div class="hint">orange = the section of the track that goes into the video (${target}s)${avail < target ? ` · <span style="color:var(--warn)">the track only has ${fmt(avail)}s left</span>` : ''}</div>
-    <div class="field"><label>Start in track</label><input type="number" data-mk="start" step="0.1" min="0" max="${m.duration}" value="${m.start}"><button class="small" id="muNow">= now</button></div>
-    ${slider('volume', 'Volume', 0, 2, 0.05)}
+    <div class="field"><label>Start in track (s)</label><input type="number" data-mk="start" step="0.1" min="0" max="${m.duration}" value="${m.start}"><span class="hint">s</span><button class="small" id="muNow">= now</button></div>
+    ${slider('volume', 'Volume (%)', 0, 2, 0.05)}
     <div class="field"><label>On beat</label><input type="checkbox" data-mk="beat_sync" ${m.beat_sync ? 'checked' : ''}><span class="hint">cuts automatically align to the beat</span></div>
+    <div class="field"><label title="${FIELD_DESC.punch}">Beat punches</label><input type="checkbox" data-mk="punch" ${m.punch ? 'checked' : ''}><span class="hint">whole frame snaps with the beat (B1)</span></div>
+    ${m.punch ? `<div class="field" style="min-width:90px"><label>Every</label><input type="number" data-mk="punch_every" min="1" max="8" step="1" value="${m.punch_every ?? 2}"><span class="hint">beat(s)</span></div>
+      ${slider('punch_amount', 'Punch strength', 0, 0.2, 0.01)}` : ''}
     <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
     <div class="adv">
-      ${slider('fade_in', 'Fade in (s)', 0, 5, 0.1)}
-      ${slider('fade_out', 'Fade out (s)', 0, 5, 0.1)}
+      ${slider('fade_in', 'Fade in', 0, 5, 0.1)}
+      ${slider('fade_out', 'Fade out', 0, 5, 0.1)}
       ${P.media.some(x => x.has_audio) ? `<div class="field"><label>Ducking</label><input type="checkbox" data-mk="duck" ${m.duck !== false ? 'checked' : ''}><span class="hint">music ducks when clip audio is audible</span></div>` : ''}
     </div>
     <span class="hint" id="muSaved"></span>`;
@@ -511,25 +720,175 @@ function renderMusic() {
     const v = k => body.querySelector(`[data-mk=${k}]`);
     const settings = {start: +v('start').value, volume: +v('volume').value, fade_in: +v('fade_in').value,
                       fade_out: +v('fade_out').value, beat_sync: v('beat_sync').checked,
-                      duck: v('duck') ? v('duck').checked : true};
+                      duck: v('duck') ? v('duck').checked : true, punch: v('punch').checked,
+                      punch_every: v('punch_every') ? +v('punch_every').value : (m.punch_every ?? 2),
+                      punch_amount: v('punch_amount') ? +v('punch_amount').value : (m.punch_amount ?? 0.06)};
     try {
       const r = await api(`/api/projects/${P.id}/music`, jsonOpt('PUT', settings));
       const startChanged = r.music.start !== P.music.start;
+      const punchChanged = r.music.punch !== P.music.punch;
       P.music = r.music;
       if (r.resnapped) { await refresh(); renderPlan() }
-      if (startChanged) renderMusic();
+      if (startChanged || punchChanged) renderMusic();
       $('#muSaved').textContent = r.resnapped ? '✓ saved · cuts realigned to the beat' : '✓ saved';
       $('#muSaved').style.color = 'var(--ok)';
     } catch (e) { $('#muSaved').textContent = e.message; $('#muSaved').style.color = 'var(--err)' }
   }, 450);
   body.querySelectorAll('[data-mk]').forEach(i => i.addEventListener(i.type === 'number' ? 'change' : 'input', () => {
-    if (i.type === 'range') i.nextElementSibling.textContent = fmt(+i.value);
+    if (i.type === 'range') i.nextElementSibling.textContent = fmtUnit(i.dataset.mk, +i.value);
     save();
   }));
   bindAdvToggle(body);
   $('#muNow').onclick = () => { body.querySelector('[data-mk=start]').value = fmt($('#mu').currentTime); save() };
   $('#muEnergy').onclick = e => { const s = e.target.dataset.s; if (s != null) { body.querySelector('[data-mk=start]').value = s; save() } };
 }
+
+// ---------------- ambience (second, simpler background layer - no beat analysis) ----------------
+$('#amBtn').onclick = () => $('#amIn').click();
+$('#amIn').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  $('#amName').textContent = 'uploading…';
+  try { const r = await api(`/api/projects/${P.id}/ambience`, {method: 'POST', body: fd}); P.ambience = r.ambience }
+  catch (err) { $('#amName').textContent = err.message; return }
+  renderAmbience();
+};
+$('#amDel').onclick = async () => { await api(`/api/projects/${P.id}/ambience`, {method: 'DELETE'}); P.ambience = null; renderAmbience() };
+function renderAmbience() {
+  const m = P.ambience, body = $('#amBody');
+  if (!$('#amDel')) return;
+  $('#amDel').hidden = !m;
+  if (!m) { $('#amName').textContent = 'no track'; body.hidden = true; return }
+  $('#amName').innerHTML = `<b style="color:var(--text)">${esc(m.file)}</b> · ${fmt(m.duration)}s`;
+  body.hidden = false;
+  const slider = (k, l, mn, mx, st) => `<div class="field"><label>${l}</label><input type="range" data-ak="${k}" min="${mn}" max="${mx}" step="${st}" value="${m[k]}"><span class="v">${fmtUnit(k, m[k])}</span></div>`;
+  body.innerHTML = `
+    <audio src="/api/projects/${P.id}/ambience/file" controls preload="metadata"></audio>
+    <div class="field"><label>Start in track (s)</label><input type="number" data-ak="start" step="0.1" min="0" max="${m.duration}" value="${m.start}"></div>
+    ${slider('volume', 'Volume (%)', 0, 2, 0.05)}
+    ${slider('fade_in', 'Fade in', 0, 5, 0.1)}
+    ${slider('fade_out', 'Fade out', 0, 5, 0.1)}
+    <div class="field"><label>Ducking</label><input type="checkbox" data-ak="duck" ${m.duck !== false ? 'checked' : ''}><span class="hint">lowers while the clips' own sound plays</span></div>
+    <span class="hint" id="amSaved"></span>`;
+  const save = debounce(async () => {
+    const v = k => body.querySelector(`[data-ak=${k}]`);
+    const settings = {start: +v('start').value, volume: +v('volume').value, fade_in: +v('fade_in').value,
+                      fade_out: +v('fade_out').value, duck: v('duck').checked};
+    try {
+      const r = await api(`/api/projects/${P.id}/ambience`, jsonOpt('PUT', settings));
+      P.ambience = r.ambience;
+      $('#amSaved').textContent = '✓ saved'; $('#amSaved').style.color = 'var(--ok)';
+    } catch (e) { $('#amSaved').textContent = e.message; $('#amSaved').style.color = 'var(--err)' }
+  }, 450);
+  body.querySelectorAll('[data-ak]').forEach(i => i.addEventListener(i.type === 'range' ? 'input' : 'change', () => {
+    if (i.type === 'range') i.nextElementSibling.textContent = fmtUnit(i.dataset.ak, +i.value);
+    save();
+  }));
+}
+
+// ---------------- lock rules (auto-lock matching clips on every regenerate) ----------------
+function ruleLabel(r) { return r.type === 'opening_seconds' ? `keep the opening ${fmt(r.seconds)}s` : `never touch clips from ${r.source}` }
+function renderLockRules() {
+  const panel = $('#lockRulesPanel');
+  if (!panel) return;
+  const rules = P.lock_rules || [];
+  $('#lockRulesList').innerHTML = rules.length
+    ? rules.map((r, i) => `<span class="b set" style="margin:0 6px 4px 0;display:inline-flex;align-items:center;gap:5px">🔒 ${esc(ruleLabel(r))} <button class="small ghost" data-rmrule="${i}" style="padding:0 5px">✕</button></span>`).join('')
+    : 'No rules yet.';
+  panel.querySelectorAll('[data-rmrule]').forEach(b => b.onclick = () => saveLockRules(rules.filter((_, i) => i !== +b.dataset.rmrule)));
+  const sel = $('#lrSource');
+  if (sel) sel.innerHTML = P.media.map(m => `<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('') || '<option value="">(no files yet)</option>';
+}
+async function saveLockRules(rules) {
+  const r = await api(`/api/projects/${P.id}/lockrules`, jsonOpt('PUT', {rules}));
+  P.lock_rules = r.lock_rules;
+  await refresh();
+  renderLockRules(); renderPlan();
+}
+$('#lrAddOpening').onclick = () => {
+  const seconds = +$('#lrSeconds').value;
+  if (!(seconds > 0)) return;
+  saveLockRules([...(P.lock_rules || []), {type: 'opening_seconds', seconds}]);
+};
+$('#lrAddSource').onclick = () => {
+  const source = $('#lrSource').value;
+  if (!source) return;
+  if ((P.lock_rules || []).some(r => r.type === 'source' && r.source === source)) return;   // already have this exact rule
+  saveLockRules([...(P.lock_rules || []), {type: 'source', source}]);
+};
+
+// ---------------- overlays (B-roll / PIP / split-screen - a second, manual-only video layer) ----------------
+// Part of the EDL itself (edl.py's OverlayItem), not a separate endpoint like lock rules - saved
+// through the same debounced saveEdl() as clips/texts/sfx.
+const OVERLAY_MODES = [['pip_tl', '↖ PIP top-left'], ['pip_tr', '↗ PIP top-right'], ['pip_bl', '↙ PIP bottom-left'],
+                       ['pip_br', '↘ PIP bottom-right'], ['split_left', '◧ Split left'], ['split_right', '◨ Split right']];
+const totalMainDuration = () => (P.edl?.clips || []).reduce((s, c) => s + clipDur(c), 0);
+const overlayDur = o => o.in != null ? (o.out - o.in) : (o.duration ?? 2.5);
+function renderOverlays() {
+  const panel = $('#overlaysPanel');
+  if (!panel || !P.edl) return;
+  const overlays = P.edl.overlays || [];
+  const total = totalMainDuration();
+  $('#overlaysList').innerHTML = overlays.length ? overlays.map((o, i) => {
+    const m = mediaOf(o.source) || {};
+    const dur = overlayDur(o);
+    return `<div class="clip" data-oi="${i}" style="padding:8px">
+      <div style="flex:1">
+        <div class="row" style="gap:8px;align-items:center">
+          <img src="${thumb(o.source)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px" alt="">
+          <div><div class="src" title="${esc(o.source)}">${esc(o.source)}</div>
+          <div class="hint">${(OVERLAY_MODES.find(([v]) => v === o.mode) || [])[1] || o.mode} · ${fmt(o.start)}–${fmt(o.start + dur)}s (${fmt(dur)}s)</div></div>
+          <div class="sp" style="flex:1"></div>
+          <button class="small" data-rmov="${i}" title="Remove">✕</button>
+        </div>
+        <div class="row" style="margin-top:6px;gap:8px;flex-wrap:wrap">
+          <div class="field" style="min-width:80px"><label>Start (s)</label><input type="number" data-ovf="start" step="0.1" min="0" max="${fmt(total)}" value="${o.start}"></div>
+          ${m.kind === 'video'
+            ? `<div class="field"><label>In / out (s)</label><span class="row" style="gap:4px"><input type="number" data-ovf="in" step="0.1" min="0" max="${m.duration}" value="${o.in}" style="width:60px"><input type="number" data-ovf="out" step="0.1" min="0" max="${m.duration}" value="${o.out}" style="width:60px"></span></div>`
+            : `<div class="field" style="min-width:80px"><label>Duration (s)</label><input type="number" data-ovf="duration" step="0.1" min="0.3" max="20" value="${o.duration ?? 2.5}"></div>`}
+          <div class="field" style="min-width:150px"><label>Position</label><select data-ovf="mode">${OVERLAY_MODES.map(([v, l]) => `<option value="${v}" ${o.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          ${o.mode.startsWith('pip_') ? `<div class="field" style="min-width:100px"><label>Size</label><input type="range" data-ovf="scale" min="0.15" max="0.6" step="0.01" value="${o.scale ?? 0.35}"><span class="v">${Math.round((o.scale ?? 0.35) * 100)}%</span></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('') : 'No overlays yet.';
+  bindOverlays();
+  const sel = $('#ovSource');
+  if (sel) sel.innerHTML = P.media.map(m => `<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('') || '<option value="">(no files yet)</option>';
+}
+function bindOverlays() {
+  const overlays = P.edl.overlays || [];
+  $('#overlaysList').querySelectorAll('[data-rmov]').forEach(b => b.onclick = () => {
+    snapshotEdl();
+    P.edl.overlays.splice(+b.dataset.rmov, 1);
+    saveEdl(); renderOverlays();
+  });
+  $('#overlaysList').querySelectorAll('.clip[data-oi]').forEach(row => {
+    const i = +row.dataset.oi, o = overlays[i];
+    row.querySelectorAll('[data-ovf]').forEach(inp => {
+      if (inp.type === 'range') inp.addEventListener('pointerdown', () => snapshotEdl());
+      inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
+        const f = inp.dataset.ovf;
+        if (inp.type !== 'range') snapshotEdl();
+        o[f] = inp.tagName === 'SELECT' ? inp.value : +inp.value;
+        if (f === 'mode') { saveEdl(); renderOverlays(); return }   // pip<->split toggles whether the Size slider shows
+        if (inp.type === 'range') { inp.nextElementSibling.textContent = Math.round(o[f] * 100) + '%'; saveEdl() }
+        else { saveEdl(); renderOverlays() }
+      });
+    });
+  });
+}
+$('#ovAdd').onclick = () => {
+  const source = $('#ovSource').value;
+  const m = mediaOf(source);
+  if (!m) return;
+  snapshotEdl();
+  const item = m.kind === 'video'
+    ? {source, in: 0, out: Math.min(3, m.duration || 3), start: 0, mode: 'pip_br', scale: 0.35}
+    : {source, duration: 2.5, start: 0, mode: 'pip_br', scale: 0.35};
+  P.edl.overlays = [...(P.edl.overlays || []), item];
+  saveEdl(); renderOverlays();
+};
 
 // ---------------- demo (pre-built example plans, no AI call) ----------------
 function renderDemoBtns() {
@@ -557,17 +916,32 @@ async function loadDemo(key) {
 }
 
 // ---------------- preset + fields ----------------
+function renderPresetOptions() {
+  const customKeys = CFG.custom_keys || [];
+  const builtins = Object.keys(CFG.presets).filter(k => !customKeys.includes(k));
+  const lbl = k => (CFG.custom_presets && CFG.custom_presets[k] && CFG.custom_presets[k].label) || k;
+  let html = `<optgroup label="Built-in">${builtins.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('')}</optgroup>`;
+  if (customKeys.length) html += `<optgroup label="My presets">${customKeys.map(k => `<option value="${esc(k)}">★ ${esc(lbl(k))}</option>`).join('')}</optgroup>`;
+  $('#preset').innerHTML = html;
+}
 function renderSettings() {
   $('#preset').value = P.preset;
   const base = CFG.presets[P.preset];
   PRESET_FIELDS.forEach(k => { $('#f_' + k).value = String(P.overrides[k] ?? base[k]); markOverride(k) });
   $('#f_notes').value = P.overrides.notes ?? base.notes ?? '';
+  resetDelArm();
+  $('#presetDelBtn').hidden = !(CFG.custom_keys || []).includes(P.preset);
 }
 function markOverride(k) {
   const el = $('#f_' + k); const base = CFG.presets[$('#preset').value];
   el.style.borderColor = String(base[k]) !== el.value ? 'var(--acc)' : '';
 }
+function clampDuration(v) {
+  v = Math.round(+v);
+  return Number.isFinite(v) ? Math.min(120, Math.max(5, v)) : 30;
+}
 const saveSettings = debounce(async () => {
+  $('#f_target_duration').value = clampDuration($('#f_target_duration').value);
   const preset = $('#preset').value, base = CFG.presets[preset], overrides = {};
   PRESET_FIELDS.forEach(k => { const v = $('#f_' + k).value; if (String(base[k]) !== v) overrides[k] = k === 'target_duration' ? +v : v; markOverride(k) });
   if ($('#f_notes').value.trim()) overrides.notes = $('#f_notes').value.trim();
@@ -577,6 +951,66 @@ const saveSettings = debounce(async () => {
 $('#preset').onchange = () => { P.preset = $('#preset').value; P.overrides = {}; renderSettings(); saveSettings(); renderMusic(); renderPlan() };
 PRESET_FIELDS.concat('notes').forEach(k => $('#f_' + k).addEventListener('input', saveSettings));
 $('#f_target_duration').addEventListener('input', () => { renderMusic(); renderPlan() });
+document.querySelectorAll('.durQ').forEach(b => b.onclick = () => {
+  $('#f_target_duration').value = b.dataset.s;
+  $('#f_target_duration').dispatchEvent(new Event('input', {bubbles: true}));
+});
+$('#f_target_duration').addEventListener('blur', () => {
+  $('#f_target_duration').value = clampDuration($('#f_target_duration').value);
+  renderMusic(); renderPlan();
+});
+
+// ---- save current preset+fields as a new named, reusable custom preset ----
+function currentPresetValues() {
+  const base = CFG.presets[$('#preset').value];
+  const v = {};
+  PRESET_FIELDS.forEach(k => { v[k] = $('#f_' + k).value; });
+  v.target_duration = clampDuration(v.target_duration);
+  v.notes = $('#f_notes').value.trim() || base.notes || '';
+  return v;
+}
+$('#presetSaveBtn').onclick = () => {
+  $('#savePresetName').value = '';
+  $('#savePresetMsg').hidden = true;
+  $('#savePresetModal').hidden = false;
+  $('#savePresetName').focus();
+};
+$('#savePresetClose').onclick = () => { $('#savePresetModal').hidden = true };
+$('#savePresetModal').onclick = e => { if (e.target.id === 'savePresetModal') $('#savePresetModal').hidden = true };
+$('#savePresetName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#savePresetConfirm').click() });
+$('#savePresetConfirm').onclick = async () => {
+  const label = $('#savePresetName').value.trim();
+  if (!label) { alertStatus('#savePresetMsg', 'Give it a name first.', true); return }
+  try {
+    const r = await api('/api/presets/custom', jsonOpt('POST', {label, preset: currentPresetValues()}));
+    CFG.presets[r.key] = {...r}; delete CFG.presets[r.key].ok; delete CFG.presets[r.key].key; delete CFG.presets[r.key].label;
+    CFG.custom_keys = [...(CFG.custom_keys || []), r.key];
+    CFG.custom_presets = {...(CFG.custom_presets || {}), [r.key]: {label: r.label, ...currentPresetValues()}};
+    renderPresetOptions();
+    P.preset = r.key; P.overrides = {};
+    $('#preset').value = r.key;
+    renderSettings(); saveSettings(); renderMusic(); renderPlan();
+    $('#savePresetModal').hidden = true;
+  } catch (e) { alertStatus('#savePresetMsg', e.message, true) }
+};
+let delArm = false, delTimer = null;
+function resetDelArm() { delArm = false; clearTimeout(delTimer); $('#presetDelBtn').textContent = '🗑 Delete preset' }
+$('#presetDelBtn').onclick = async () => {
+  if (!delArm) {
+    delArm = true; $('#presetDelBtn').textContent = 'Click again to confirm';
+    delTimer = setTimeout(resetDelArm, 3000);
+    return;
+  }
+  resetDelArm();
+  const key = P.preset;
+  await api(`/api/presets/custom/${key}`, {method: 'DELETE'});
+  delete CFG.presets[key]; CFG.custom_keys = (CFG.custom_keys || []).filter(k => k !== key);
+  if (CFG.custom_presets) delete CFG.custom_presets[key];
+  renderPresetOptions();
+  P.preset = 'neutral'; P.overrides = {};
+  await api(`/api/projects/${P.id}/settings`, jsonOpt('PUT', {preset: 'neutral', overrides: {}}));
+  renderSettings(); renderMusic(); renderPlan();
+};
 
 // ---------------- jobs ----------------
 async function waitJob(jid, statusSel, label) {
@@ -590,6 +1024,29 @@ async function waitJob(jid, statusSel, label) {
   }
 }
 function alertStatus(sel, msg, err = false, ok = false) { const s = $(sel); s.hidden = false; s.textContent = msg; s.className = 'status' + (err ? ' err' : ok ? ' ok' : '') }
+// ---------------- deep scan: re-examine one clip with many more frames (opt-in, per clip) ----------------
+async function runDeepScan(i, btn) {
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '🔍 Scanning…';
+  try {
+    await saveEdl.flush();
+    const {job} = await api(`/api/projects/${P.id}/deepscan/${i}`, {method: 'POST'});
+    const t0 = Date.now();
+    while (true) {
+      const j = await api(`/api/jobs/${job}`);
+      if (j.status === 'done') { showEdlMsg(`✓ refined: ${fmt(j.result.clip.out - j.result.clip.in)}s cut`); break }
+      if (j.status === 'error') throw new Error(j.error);
+      btn.textContent = `🔍 Scanning… ${Math.round((Date.now() - t0) / 1000)}s`;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    snapshotEdl();
+    await refresh();
+    renderPlan();
+  } catch (e) {
+    showEdlMsg(e.message, true);
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
 
 $('#planBtn').onclick = async () => {
   $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = true;
@@ -604,6 +1061,50 @@ $('#planBtn').onclick = async () => {
   } catch (e) { alertStatus('#planStatus', e.message, true) }
   $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = false;
 };
+
+// ---------------- multiple draft variants (generate 2-3 structurally different takes at once) ----------------
+let PENDING_VARIANTS = [];
+$('#variantsBtn').onclick = async () => {
+  $('#variantsBtn').disabled = $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = true;
+  $('#planStatus').className = 'status';
+  await saveSettings.flush();
+  await saveEdl.flush();
+  try {
+    const {job} = await api(`/api/projects/${P.id}/plan/variants?n=3`, {method: 'POST'});
+    const r = await waitJob(job, '#planStatus', 'The AI is drafting 3 different takes');
+    PENDING_VARIANTS = r.variants;
+    renderVariantsModal();
+    $('#variantsModal').hidden = false;
+    alertStatus('#planStatus', `${r.variants.filter(v => v.edl).length} of ${r.variants.length} drafts ready - pick one`, false, true);
+  } catch (e) { alertStatus('#planStatus', e.message, true) }
+  $('#variantsBtn').disabled = $('#planBtn').disabled = $('#draftBtn').disabled = $('#finalBtn').disabled = false;
+};
+function renderVariantsModal() {
+  $('#variantsList').innerHTML = PENDING_VARIANTS.map(v => v.edl ? `
+    <div class="variantCard">
+      <div class="row"><b>Variant ${esc(v.label)}</b><span class="hint">${v.clips} clip${v.clips === 1 ? '' : 's'} · ${fmt(v.total)}s</span><div class="sp" style="flex:1"></div>
+        <button class="small primary" data-usevariant="${esc(v.label)}">Use this</button></div>
+      <div class="hint" style="margin-top:6px">${esc(v.reasoning || '')}</div>
+    </div>` : `
+    <div class="variantCard err">
+      <div class="row"><b>Variant ${esc(v.label)}</b><span class="hint" style="color:var(--err)">failed</span></div>
+      <div class="hint" style="margin-top:6px">${esc(v.error || '')}</div>
+    </div>`).join('');
+  $('#variantsList').querySelectorAll('[data-usevariant]').forEach(b => b.onclick = async () => {
+    const v = PENDING_VARIANTS.find(x => x.label === b.dataset.usevariant);
+    if (!v) return;
+    b.disabled = true; b.textContent = 'Using…';
+    try {
+      const r = await api(`/api/projects/${P.id}/plan/select`, jsonOpt('POST', {edl: v.edl, reasoning: v.reasoning, usage: v.usage}));
+      $('#variantsModal').hidden = true;
+      PENDING_VARIANTS = [];
+      await refresh(); selClip = null; clearHistory(); renderPlan();
+      alertStatus('#planStatus', `Using variant ${v.label}: ${P.edl.clips.length} clips, ${fmt(r.total)}s`, false, true);
+    } catch (e) { alertStatus('#planStatus', e.message, true); b.disabled = false; b.textContent = 'Use this' }
+  });
+}
+$('#variantsClose').onclick = () => { $('#variantsModal').hidden = true };
+$('#variantsModal').onclick = e => { if (e.target.id === 'variantsModal') $('#variantsModal').hidden = true };
 
 // ---------------- plan / timeline ----------------
 function updatePlanBtn() {
@@ -636,12 +1137,44 @@ function waveBars(c) {
   if (!slice.length) return '';
   return `<div class="wave">${slice.map(v => `<i style="height:${Math.round(v * 100)}%"></i>`).join('')}</div>`;
 }
+// ---------------- per-clip filmstrip (several frames, not just one static thumbnail) ----------------
+// Same one-fetch-per-source-file + client cache pattern as the waveform above: the manifest covers
+// the WHOLE file at fixed timestamps, and each clip picks out whichever of those timestamps fall
+// inside its own in/out - so clips sharing a source (even at different ranges) share one fetch.
+let FILMSTRIPS = {};
+async function ensureFilmstrips() {
+  if (!P.edl) return;
+  const need = [...new Set(P.edl.clips.filter(c => c.in != null).map(c => c.source))]
+    .filter(src => !(src in FILMSTRIPS));
+  if (!need.length) return;
+  need.forEach(src => FILMSTRIPS[src] = null);   // mark in-flight so a second renderPlan() doesn't re-fetch
+  await Promise.all(need.map(async src => {
+    try { FILMSTRIPS[src] = await api(`/api/projects/${P.id}/filmstrip/${encodeURIComponent(src)}`) }
+    catch { FILMSTRIPS[src] = false }            // false = tried, failed (or not a video) - fall back to the single thumb
+  }));
+  if (P.edl) renderPlan();   // the project could have changed while the fetch was in flight
+}
+function filmstripHtml(c) {
+  const fs = c.in != null ? FILMSTRIPS[c.source] : null;
+  if (!fs || !fs.times || !fs.times.length) return '';
+  let idxs = fs.times.map((t, i) => [t, i]).filter(([t]) => t >= c.in && t <= c.out).map(([, i]) => i);
+  if (!idxs.length) {
+    // the clip's range is shorter than the gap between two of the file's fixed frame slots - show
+    // the single nearest one instead of leaving the segment blank
+    const mid = (c.in + c.out) / 2;
+    let best = 0, bestD = Infinity;
+    fs.times.forEach((t, i) => { const d = Math.abs(t - mid); if (d < bestD) { bestD = d; best = i } });
+    idxs = [best];
+  }
+  return `<div class="filmstrip">${idxs.map(i => `<img src="/api/projects/${P.id}/filmstrip/${encodeURIComponent(c.source)}/${i}" loading="lazy" alt="">`).join('')}</div>`;
+}
 function renderPlan() {
   const area = $('#planArea');
   updatePlanBtn();
   $('#usage').textContent = P.usage ? `last plan: ${P.usage.input_tokens} tok in / ${P.usage.output_tokens} out` : '';
   if (!P.edl) { area.innerHTML = `<div class="empty">Upload your material, choose a preset, and click "Generate plan"${DEMOS.length ? ' — or try one of the demo buttons above' : ''}.</div>`; return }
   ensureWaveforms();
+  ensureFilmstrips();
   const clips = P.edl.clips, total = clips.reduce((s, c) => s + clipDur(c), 0);
   const target = +$('#f_target_duration').value;
   const off = Math.abs(total - target) > target * 0.1;
@@ -654,16 +1187,20 @@ function renderPlan() {
       <button class="small" id="redoBtn" title="Redo (Ctrl+Y)" ${EDL_FUTURE.length ? '' : 'disabled'}>↷ Redo</button>
       <button class="small" id="splitBtn" title="Split the video clip under the preview's current playback position (S)">✂ Split</button>
       <span class="hint" id="edlMsg"></span></div>
-    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · S splits the clip at the preview's position · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it · shift/ctrl-click clips on the timeline to multi-select.</div>
+    <div class="hint" style="margin:-6px 0 6px">Shortcuts: Space play/pause · J/L step ±1s · K pause · I/O set in/out on the open file preview · S splits the clip at the preview's position · Del removes the selected clip · Ctrl+Z/Y undo/redo · drag a clip's edge on the timeline to trim it · drag the middle of a clip to reorder it · shift/ctrl-click clips on the timeline to multi-select.</div>
     ${MULTI_SEL.size ? bulkBar() : ''}
-    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${MULTI_SEL.has(i) ? 'multisel' : ''} ${c.transition_in ? 'hastr' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}">${waveBars(c)}${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
+    <div class="tlwrap"><div class="tl">${clips.map((c, i) => `<div data-i="${i}" class="${selClip === i ? 'sel' : ''} ${MULTI_SEL.has(i) ? 'multisel' : ''} ${c.transition_in ? 'hastr' : ''} ${c.low_confidence ? 'lowconf' : ''}" style="flex:${clipDur(c)};background-image:url('${thumb(c.source)}')" title="${esc(c.source)}${c.low_confidence ? ' — ⚠ the AI wasn\'t fully sure about this cut' : ''}">${filmstripHtml(c)}${waveBars(c)}${c.in != null ? '<i class="trim l" data-side="l"></i>' : ''}<span>${c.locked ? '🔒' : i + 1}</span><i class="trim r" data-side="r"></i></div>`).join('')}</div>${beatTicks(total)}</div>
     ${textTrack(total)}
     ${clips.map((c, i) => clipRow(c, i)).join('')}
-    ${Object.keys(P.transcripts || {}).length ? `<label class="row hint" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="subChk" ${P.subtitles ? 'checked' : ''}>
+    ${FEATURES.whisper && Object.keys(P.transcripts || {}).length ? `<label class="row hint" style="margin-top:14px;cursor:pointer"><input type="checkbox" id="subChk" ${P.subtitles ? 'checked' : ''}>
       Automatic subtitles from the transcript <span>(${(P.subtitles_preview || []).length} on the current timeline · recalculated on every render)</span></label>` : ''}
     <div class="row" style="margin:16px 0 8px"><b>On-screen text</b><span class="hint">times are on the final video · editing locks the text 🔒</span><div style="flex:1"></div><button class="small" id="addText">+ Add text</button></div>
-    ${(P.edl.texts || []).length ? P.edl.texts.map((t, k) => textRow(t, k, total)).join('') : '<div class="hint">No text yet. Choose a text style in the preset, or add one manually.</div>'}`;
+    ${(P.edl.texts || []).length ? P.edl.texts.map((t, k) => textRow(t, k, total)).join('') : '<div class="hint">No text yet. Choose a text style in the preset, or add one manually.</div>'}
+    ${FEATURES.sfx ? `<div class="row" style="margin:16px 0 8px"><b>Sound effects</b><span class="hint">one-shot cues from the SFX library, placed at a moment in time</span><div style="flex:1"></div><button class="small" id="addSfx">+ Add SFX</button></div>
+    ${sfxTrack(total)}
+    ${(P.edl.sfx || []).length ? P.edl.sfx.map((s, k) => sfxRow(s, k, total)).join('') : '<div class="hint">No sound effects yet - whoosh on a hard cut, ding on a text pop-in, impact on a punchline.</div>'}` : ''}`;
   area.querySelectorAll('.tl div').forEach(d => d.onclick = e => {
+    if (SUPPRESS_TL_CLICK) { SUPPRESS_TL_CLICK = false; return }   // this click is the tail end of a reorder-drag, already handled
     const i = +d.dataset.i;
     if (e.shiftKey && MULTI_ANCHOR != null) {
       const [lo, hi] = [Math.min(MULTI_ANCHOR, i), Math.max(MULTI_ANCHOR, i)];
@@ -678,12 +1215,14 @@ function renderPlan() {
       selClip = selClip === i ? null : i;
     }
     renderPlan();
-    area.querySelector(`.clip[data-i="${i}"]`)?.scrollIntoView({block: 'nearest'});
   });
   bindClips(area);
   bindTexts(area, total);
+  if (FEATURES.sfx) bindSfx(area, total);
   bindBulkBar(area);
   bindTimelineDrag(area);
+  bindTimelineReorder(area);
+  bindClipContextMenu(area);
   $('#undoBtn').onclick = undo;
   $('#redoBtn').onclick = redo;
   $('#splitBtn').onclick = trySplit;
@@ -701,21 +1240,26 @@ function textRow(t, k, total) {
   const opt = (obj, v) => Object.entries(obj).map(([a, b]) => `<option value="${a}" ${a === v ? 'selected' : ''}>${b}</option>`).join('');
   const free = t.x != null || t.y != null;
   const cx = t.x ?? 0.5, cy = t.y ?? ({top: 0.18, center: 0.5, bottom: 0.78}[t.position] ?? 0.78);
+  const vn = (t.variants || []).length;
   return `<div class="txt ${t.locked ? 'locked' : ''}" data-k="${k}">
     <input type="text" data-t="content" maxlength="80" value="${esc(t.content)}">
-    <div class="row" style="gap:4px"><button class="small lockbtn ${t.locked ? 'on' : ''}" data-ta="lock">${t.locked ? '🔒 Locked' : 'Lock'}</button><button class="small" data-ta="del">✕</button></div>
+    <div class="row" style="gap:4px">
+      ${vn ? `<button class="small" data-ta="flip" title="Flip to the next AI-suggested wording for this hook">⇄ Try another (${vn} left)</button>` : ''}
+      <button class="small lockbtn ${t.locked ? 'on' : ''}" data-ta="lock">${t.locked ? '🔒 Locked' : 'Lock'}</button><button class="small" data-ta="del">✕</button></div>
     <div class="row" style="grid-column:1/3">
-      <span class="hint">from</span><input type="number" data-t="start" step="0.1" min="0" max="${fmt(total)}" value="${t.start}">
-      <span class="hint">to</span><input type="number" data-t="end" step="0.1" min="0" max="${fmt(total)}" value="${t.end}">
+      <span class="hint">from (s)</span><input type="number" data-t="start" step="0.1" min="0" max="${fmt(total)}" value="${t.start}">
+      <span class="hint">to (s)</span><input type="number" data-t="end" step="0.1" min="0" max="${fmt(total)}" value="${t.end}">
       <select data-t="style">${opt(STYLE_LABELS, t.style)}</select>
       <select data-t="position" ${free ? 'disabled title="clear the free position to use this again"' : ''}>${opt(POS_LABELS, t.position)}</select>
       <button class="small" data-ta="now" title="starts at the current second in the preview">▶ = now</button>
     </div>
     <div class="row" style="grid-column:1/3;align-items:flex-start;gap:8px;margin-top:2px">
-      <div class="field"><label>Free position</label><div class="textpad"><i class="dot" style="left:${cx * 100}%;top:${cy * 100}%"></i></div></div>
+      <div class="field"><label>Free position (% of frame)</label><div class="textpad"><i class="dot" style="left:${cx * 100}%;top:${cy * 100}%"></i></div></div>
+      <span class="hint textPosVal">x ${Math.round(cx * 100)}% · y ${Math.round(cy * 100)}% — </span>
       <span class="hint">${free ? 'drag to fine-tune the spot on the frame.' : 'drag on the mini-frame to place this text anywhere, overriding the preset above.'}
         ${free ? `<button class="small ghost" data-ta="unfree">Use ${POS_LABELS[t.position]} preset instead</button>` : ''}</span>
-    </div></div>`;
+    </div>
+    ${t.reason ? `<div class="hint itemreason" style="grid-column:1/3" title="${esc(t.reason)}">💡 ${esc(t.reason)}</div>` : ''}</div>`;
 }
 function bindTexts(area, total) {
   const tx = P.edl.texts = P.edl.texts || [];
@@ -734,6 +1278,10 @@ function bindTexts(area, total) {
       snapshotEdl();
       if (b.dataset.ta === 'lock') tx[k].locked = !tx[k].locked;
       if (b.dataset.ta === 'del') tx.splice(k, 1);
+      if (b.dataset.ta === 'flip') {
+        const vs = tx[k].variants || [];
+        if (vs.length) { const next = vs.shift(); vs.push(tx[k].content); tx[k].content = next; tx[k].locked = true }
+      }
       if (b.dataset.ta === 'now') { const d = tx[k].end - tx[k].start; tx[k].start = +fmt($('#player').currentTime || 0); tx[k].end = +fmt(Math.min(total, tx[k].start + d)); tx[k].locked = true }
       if (b.dataset.ta === 'unfree') { tx[k].x = null; tx[k].y = null; tx[k].locked = true }
       saveEdl(); renderPlan();
@@ -758,6 +1306,8 @@ function bindTexts(area, total) {
         const py = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
         tx[k].x = +px.toFixed(3); tx[k].y = +py.toFixed(3);
         dot.style.left = `${px * 100}%`; dot.style.top = `${py * 100}%`;
+        const pv = row.querySelector('.textPosVal');
+        if (pv) pv.textContent = `x ${Math.round(px * 100)}% · y ${Math.round(py * 100)}% — `;
       };
       apply(e);
       const onMove = ev => apply(ev);
@@ -771,6 +1321,53 @@ function bindTexts(area, total) {
     });
   });
 }
+// ---------------- sound effects (one-shot cues from the bundled SFX library) ----------------
+const SFX_LABELS = {whoosh: 'Whoosh', ding: 'Ding', impact: 'Impact', pop: 'Pop', click: 'Click'};
+function sfxTrack(total) {
+  const sx = P.edl.sfx || [];
+  if (!sx.length || !total) return '';
+  return `<div class="trk sfxtrk">${sx.map((s, k) => `<div data-k="${k}" style="left:${Math.min(99, s.start / total * 100)}%" title="${SFX_LABELS[s.name] || s.name} @ ${fmt(s.start)}s">${(SFX_LABELS[s.name] || s.name)[0]}</div>`).join('')}</div>`;
+}
+function sfxRow(s, k, total) {
+  const opt = Object.entries(SFX_LABELS).map(([v, l]) => `<option value="${v}" ${v === s.name ? 'selected' : ''}>${l}</option>`).join('');
+  return `<div class="txt sfxrow" data-k="${k}">
+    <select data-s="name">${opt}</select>
+    <div class="row" style="gap:4px"><button class="small" data-sa="preview" title="play this sound">▶</button><button class="small" data-sa="del">✕</button></div>
+    <div class="row" style="grid-column:1/3">
+      <span class="hint">at (s)</span><input type="number" data-s="start" step="0.1" min="0" max="${fmt(total)}" value="${s.start}">
+      <div class="field" style="flex:1;max-width:220px"><label>Volume</label><input type="range" data-s="volume" min="0" max="3" step="0.1" value="${s.volume}"><span class="v">${Math.round(s.volume * 100)}%</span></div>
+      <button class="small" data-sa="now" title="place at the current second in the preview">▶ = now</button>
+    </div></div>`;
+}
+function bindSfx(area, total) {
+  const sx = P.edl.sfx = P.edl.sfx || [];
+  $('#addSfx').onclick = () => {
+    const st = Math.min(Math.max(0, $('#player').currentTime || 0), Math.max(0, total - 0.05));
+    const item = {name: 'whoosh', start: +fmt(st), volume: 1.0};
+    snapshotEdl();
+    sx.push(item); sx.sort((a, b) => a.start - b.start); saveEdl(); renderPlan();
+  };
+  area.querySelectorAll('.sfxtrk div').forEach(d => d.onclick = () => area.querySelector(`.sfxrow[data-k="${d.dataset.k}"] select`)?.focus());
+  area.querySelectorAll('.sfxrow').forEach(row => {
+    const k = +row.dataset.k;
+    row.querySelectorAll('[data-sa]').forEach(b => b.onclick = () => {
+      if (b.dataset.sa === 'preview') { new Audio(`/api/sfx/${sx[k].name}/file`).play().catch(() => {}); return }
+      snapshotEdl();
+      if (b.dataset.sa === 'del') sx.splice(k, 1);
+      if (b.dataset.sa === 'now') sx[k].start = +fmt($('#player').currentTime || 0);
+      saveEdl(); renderPlan();
+    });
+    row.querySelectorAll('[data-s]').forEach(inp => inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
+      if (inp.type !== 'range') snapshotEdl();
+      const f = inp.dataset.s;
+      sx[k][f] = inp.type === 'range' || inp.type === 'number' ? +inp.value : inp.value;
+      if (f === 'name') sx[k][f] = inp.value;
+      if (f === 'start') sx.sort((a, b) => a.start - b.start);
+      if (inp.type === 'range') { inp.nextElementSibling.textContent = Math.round(inp.value * 100) + '%'; saveEdl() }
+      else { saveEdl(); renderPlan() }
+    }));
+  });
+}
 function beatTicks(total) {
   const m = P.music; if (!m || !m.beat_sync || !total) return '';
   const rel = m.beats.map(b => b - m.start).filter(t => t > 0 && t < total);
@@ -780,43 +1377,61 @@ function clipRow(c, i) {
   const m = mediaOf(c.source) || {};
   const open = selClip === i;
   const timing = c.in != null
-    ? `<div class="field"><label>Start / end</label><input type="number" data-f="in" step="0.1" min="0" max="${m.duration}" value="${c.in}"><input type="number" data-f="out" step="0.1" min="0" max="${m.duration}" value="${c.out}"><span class="hint">/ ${fmt(m.duration || 0)}s</span></div>`
-    : `<div class="field"><label>Duration</label><input type="number" data-f="duration" step="0.1" min="2" max="4" value="${c.duration}"></div>
+    ? `<div class="field"><label>Start / end (s)</label><input type="number" data-f="in" step="0.1" min="0" max="${m.duration}" value="${c.in}"><input type="number" data-f="out" step="0.1" min="0" max="${m.duration}" value="${c.out}"><span class="hint">/ ${fmt(m.duration || 0)}s</span></div>`
+    : `<div class="field"><label>Duration (s)</label><input type="number" data-f="duration" step="0.1" min="2" max="4" value="${c.duration}"></div>
        <div class="field"><label>Motion</label><select data-f="motion">${['zoom_in', 'zoom_out', 'static'].map(v => `<option ${c.motion === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
   return `<div class="clip ${open ? 'sel' : ''} ${MULTI_SEL.has(i) ? 'multisel' : ''} ${c.locked ? 'locked' : ''}" data-i="${i}">
     <div class="ix">${i + 1}</div>
     <img src="${thumb(c.source)}" alt="">
     <div><div class="src" title="${esc(c.source)}">${esc(c.source)}</div>
       <div class="hint">${c.in != null ? `${fmt(c.in)}–${fmt(c.out)}s` : 'photo'} · ${fmt(clipDur(c))}s · ${c.fit === 'blur_pad' ? 'blurred' : 'crop'}${(c.speed && c.speed !== 1) ? ` · ${fmt(c.speed)}× ${c.speed > 1 ? 'timelapse' : 'slow-mo'}` : ''}</div>
-      <div class="hint">L ${fmt(c.brightness)} · C ${fmt(c.contrast)} · S ${fmt(c.saturation)} · K ${fmt(c.warmth)}</div>
-      ${m.has_audio ? `<div class="hint">🔊 sound ${(c.volume ?? 1) > 0 ? fmt((c.volume ?? 1) * 100) + '%' : 'off'}</div>` : ''}
-      ${i > 0 ? `<div class="trb">${c.transition_in ? `↘ enters with ${c.transition_in.type} ${fmt(c.transition_in.duration)}s` : '| direct cut'}</div>` : ''}</div>
+      <div class="hint" title="Brightness · Contrast · Saturation · Warmth — 0/1× = unchanged">B ${fmtUnit('brightness', c.brightness)} · C ${fmtUnit('contrast', c.contrast)} · S ${fmtUnit('saturation', c.saturation)} · W ${fmtUnit('warmth', c.warmth)}</div>
+      ${m.has_audio ? `<div class="hint" title="${FIELD_DESC.volume}">🔊 sound ${(c.volume ?? 1) > 0 ? fmtUnit('volume', c.volume ?? 1) : 'off'}${c.audio_lead ? ` · 🔊⇤ J-cut ${fmt(c.audio_lead)}s` : ''}${c.audio_lag ? ` · 🔊⇥ L-cut ${fmt(c.audio_lag)}s` : ''}</div>` : ''}
+      ${i > 0 ? `<div class="trb">${c.transition_in ? `↘ enters with ${c.transition_in.type} ${fmt(c.transition_in.duration)}s` : '| direct cut'}</div>` : ''}
+      ${c.low_confidence ? `<div class="hint" style="color:var(--warn)">⚠ the AI wasn't fully sure about this cut (fast/action-heavy moment) — worth a manual check</div>` : ''}
+      ${c.reason ? `<div class="hint itemreason" title="${esc(c.reason)}">💡 ${esc(c.reason)}</div>` : ''}</div>
     <div class="ctrl">
       <button class="small lockbtn ${c.locked ? 'on' : ''}" data-a="lock" title="Locked = the AI won't change it on regenerate">${c.locked ? '🔒 Locked' : 'Lock'}</button>
       <div class="row" style="gap:3px"><button class="small" data-a="up" ${i === 0 ? 'disabled' : ''}>↑</button><button class="small" data-a="down" ${i === P.edl.clips.length - 1 ? 'disabled' : ''}>↓</button></div>
       <button class="small" data-a="edit">${open ? 'Close' : 'Edit'}</button>
+      ${FEATURES.deepScan && c.in != null ? `<button class="small" data-a="deepscan" title="Re-examine this clip with 20 frames instead of 4 and let the AI refine the exact cut - useful for fast or action-heavy footage">🔍 Deep scan</button>` : ''}
       <button class="small" data-a="del" title="Delete">✕</button>
     </div>
     ${open ? `<div class="det">${timing}
       ${i > 0 ? `<div class="field"><label>Transition</label><select data-f="tr_type"><option value="">direct cut</option>${TR_TYPES.map(t => `<option ${c.transition_in?.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <input type="number" data-f="tr_dur" step="0.05" min="0.15" max="1" value="${c.transition_in?.duration ?? 0.4}" ${c.transition_in ? '' : 'disabled'}><span class="hint">s</span></div>` : ''}
       <div class="field"><label>Framing</label><select data-f="fit"><option value="crop_center" ${c.fit === 'crop_center' ? 'selected' : ''}>center crop</option><option value="blur_pad" ${c.fit === 'blur_pad' ? 'selected' : ''}>blurred background</option></select></div>
-      ${c.fit === 'crop_center' ? `<div class="field"><label title="Slides the crop within whatever the frame doesn't show - only has room on whichever axis the crop is actually cutting into.">Reframe</label><div class="panpad"><i class="dot" style="left:${((c.pan_x ?? 0) * 50 + 50)}%;top:${((c.pan_y ?? 0) * 50 + 50)}%"></i></div><span class="hint">drag to re-center the crop</span></div>` : ''}
-      ${c.in != null ? `<div class="field"><label title="Changes how fast the clip plays - the on-screen duration above updates with it. Original audio is time-stretched to match.">Speed</label><input type="range" data-f="speed" min="0.25" max="4" step="0.05" value="${c.speed ?? 1}"><span class="v">${fmt(c.speed ?? 1)}×</span></div>` : ''}
+      ${FEATURES.advancedClip ? `${c.fit === 'crop_center' ? `<div class="field"><label title="Slides the crop within whatever the frame doesn't show - only has room on whichever axis the crop is actually cutting into.">Reframe (% from center)</label><div class="panpad"><i class="dot" style="left:${((c.pan_x ?? 0) * 50 + 50)}%;top:${((c.pan_y ?? 0) * 50 + 50)}%"></i></div><span class="hint" id="panVal">x ${Math.round((c.pan_x ?? 0) * 100)}% · y ${Math.round((c.pan_y ?? 0) * 100)}% — drag to re-center the crop</span></div>` : ''}
+      ${c.in != null ? `<div class="field"><label title="${FIELD_DESC.speed}">Speed</label><input type="range" data-f="speed" min="0.25" max="4" step="0.05" value="${c.speed ?? 1}"><span class="v">${fmtUnit('speed', c.speed ?? 1)}</span></div>` : ''}
       <div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
       <div class="adv">
-        ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field"><label>${l}</label><input type="range" data-f="${k}" min="${mn}" max="${mx}" step="${st}" value="${c[k]}"><span class="v">${fmt(c[k])}</span></div>`).join('')}
-        ${m.has_audio ? `<div class="field"><label>🔊 Original sound</label><input type="range" data-f="volume" min="0" max="2" step="0.05" value="${c.volume ?? 1}"><span class="v">${fmt(c.volume ?? 1)}</span></div>` : ''}
-      </div>
+        ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field"><label title="${FIELD_DESC[k] || ''}">${l}</label><input type="range" data-f="${k}" min="${mn}" max="${mx}" step="${st}" value="${c[k]}"><span class="v">${fmtUnit(k, c[k])}</span></div>`).join('')}
+        ${m.has_audio ? `<div class="field"><label title="${FIELD_DESC.volume}">🔊 Original sound (%)</label><input type="range" data-f="volume" min="0" max="2" step="0.05" value="${c.volume ?? 1}"><span class="v">${fmtUnit('volume', c.volume ?? 1)}</span></div>` : ''}
+        ${m.has_audio && c.in != null && i > 0 ? `<div class="field"><label title="${FIELD_DESC.audio_lead}">🔊⇤ J-cut (sound starts early)</label><input type="range" data-f="audio_lead" min="0" max="5" step="0.1" value="${c.audio_lead ?? 0}"><span class="v">${fmtUnit('audio_lead', c.audio_lead ?? 0)}</span></div>` : ''}
+        ${m.has_audio && c.in != null && i < P.edl.clips.length - 1 ? `<div class="field"><label title="${FIELD_DESC.audio_lag}">🔊⇥ L-cut (sound lingers after)</label><input type="range" data-f="audio_lag" min="0" max="5" step="0.1" value="${c.audio_lag ?? 0}"><span class="v">${fmtUnit('audio_lag', c.audio_lag ?? 0)}</span></div>` : ''}
+      </div>` : ''}
       <div class="hint">A manual change automatically locks the clip 🔒.</div></div>` : ''}
   </div>`;
 }
+// A plain debounce only guards the TIMER - it stops two saves from being SCHEDULED at once, but
+// nothing stops two from being IN FLIGHT at once (e.g. a normal debounced save still awaiting its
+// network response when the Render button's saveEdl.flush() fires a second one right after an
+// undo). Two concurrent PUTs can land on the server out of SEND order, so the older (pre-undo)
+// body can overwrite the newer (post-undo, correct) one that already saved. SAVE_CHAIN forces every
+// actual PUT through one at a time, in the order they were sent, so an older write can never land
+// after a newer one - this is what actually fixes the race, not the debounce above it.
+let SAVE_CHAIN = Promise.resolve();
 const saveEdl = debounce(async () => {
-  try {
-    await api(`/api/projects/${P.id}/edl`, jsonOpt('PUT', P.edl));
+  const payload = P.edl;   // snapshot now - this call's truth, whatever happens while it waits its turn
+  const thisSave = SAVE_CHAIN = SAVE_CHAIN.catch(() => {}).then(async () => {
+    await api(`/api/projects/${P.id}/edl`, jsonOpt('PUT', payload));
     P.is_demo = null;   // a manual edit means this is no longer the untouched demo/AI plan
     if (Object.keys(P.transcripts || {}).length) { const np = await api(`/api/projects/${P.id}`); P.subtitles_preview = np.subtitles_preview; const tr = document.querySelector('.trk'); if (tr) tr.outerHTML = textTrack(P.edl.clips.reduce((s, c) => s + clipDur(c), 0)) }
+  });
+  try {
+    await thisSave;
     $('#edlMsg').textContent = '✓ saved'; $('#edlMsg').style.color = 'var(--ok)';
+    if (FEATURES.quickPreview && $('#autoPreviewChk')?.checked) triggerPreview();
   }
   catch (e) { $('#edlMsg').textContent = e.message; $('#edlMsg').style.color = 'var(--err)' }
 }, 400);
@@ -830,10 +1445,10 @@ function bulkBar() {
     <button class="small" id="bulkDel" style="color:var(--err)">✕ Delete</button>
     <button class="small ghost" id="bulkClear">Clear</button>
   </div>
-  <div class="row bulkbar" style="margin-top:-8px">
+  ${FEATURES.advancedClip ? `<div class="row bulkbar" style="margin-top:-8px">
     <span class="hint">apply to all selected:</span>
-    ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field" style="min-width:84px"><label>${l}</label><input type="range" data-bulk="${k}" min="${mn}" max="${mx}" step="${st}" value="${first[k]}"></div>`).join('')}
-  </div>`;
+    ${COLOR_KEYS.map(([k, l, mn, mx, st]) => `<div class="field" style="min-width:84px"><label title="${FIELD_DESC[k] || ''}">${l}</label><input type="range" data-bulk="${k}" min="${mn}" max="${mx}" step="${st}" value="${first[k]}"><span class="v">${fmtUnit(k, first[k])}</span></div>`).join('')}
+  </div>` : ''}`;
 }
 function bindBulkBar(area) {
   const lock = $('#bulkLock'), unlock = $('#bulkUnlock'), del = $('#bulkDel'), clear = $('#bulkClear');
@@ -852,6 +1467,7 @@ function bindBulkBar(area) {
     inp.addEventListener('input', () => {
       const f = inp.dataset.bulk, v = +inp.value;
       MULTI_SEL.forEach(i => { const c = P.edl.clips[i]; if (c) { c[f] = v; c.locked = true } });
+      if (inp.nextElementSibling) inp.nextElementSibling.textContent = fmtUnit(f, v);
       saveEdl();
     });
     inp.addEventListener('change', () => renderPlan());   // re-render once, after the drag ends
@@ -863,6 +1479,7 @@ function bindClips(area) {
     bindAdvToggle(row);
     row.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       const a = b.dataset.a;
+      if (a === 'deepscan') { runDeepScan(i, b); return }
       if (a !== 'edit') snapshotEdl();
       if (a === 'del' || a === 'up' || a === 'down') clearMultiSel();   // these shift indices - a stale selection would point at the wrong clips
       if (a === 'lock') clips[i].locked = !clips[i].locked;
@@ -885,7 +1502,7 @@ function bindClips(area) {
         else c[f] = inp.tagName === 'SELECT' ? inp.value : +inp.value;
         if (f === 'fit' && c.fit !== 'crop_center') { c.pan_x = 0; c.pan_y = 0 }   // the server rejects a pan on blur_pad
         c.locked = true;
-        if (inp.type === 'range') { inp.nextElementSibling.textContent = fmt(+inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
+        if (inp.type === 'range') { inp.nextElementSibling.textContent = fmtUnit(f, +inp.value); row.querySelector('.lockbtn').textContent = '🔒 Locked'; row.querySelector('.lockbtn').classList.add('on'); row.classList.add('locked'); updatePlanBtn(); saveEdl() }
         else { saveEdl(); renderPlan() }
       });
     });
@@ -903,6 +1520,8 @@ function bindClips(area) {
         c.pan_x = +((px * 2 - 1).toFixed(3));
         c.pan_y = +((py * 2 - 1).toFixed(3));
         dot.style.left = `${px * 100}%`; dot.style.top = `${py * 100}%`;
+        const pv = row.querySelector('#panVal');
+        if (pv) pv.textContent = `x ${Math.round(c.pan_x * 100)}% · y ${Math.round(c.pan_y * 100)}% — drag to re-center the crop`;
       };
       apply(e);
       const onMove = ev => apply(ev);
@@ -950,6 +1569,191 @@ function trySplit() {
   const second = {...c, in: splitPoint, transition_in: null, locked: true};
   P.edl.clips.splice(hit.idx, 1, first, second);
   selClip = hit.idx + 1;
+  saveEdl(); renderPlan();
+}
+// Drag-reorder: pulling the MIDDLE of a clip (not its edge handles) across the timeline moves it
+// to a new position. We don't track pixel math either - we just physically move the segment's own
+// DOM node to sit before/after whichever sibling the pointer is currently over; flex reflows the
+// row for free. On release we read the segment order straight back out of the DOM (by each node's
+// original data-i) and rebuild P.edl.clips from that - no index arithmetic to get wrong. A drag
+// under ~6px is treated as a click (selection), not a reorder, same threshold style as the trim code.
+function bindTimelineReorder(area) {
+  const tlDiv = area.querySelector('.tl');
+  if (!tlDiv) return;
+  tlDiv.querySelectorAll(':scope > [data-i]').forEach(seg => {
+    seg.addEventListener('pointerdown', e => {
+      if (e.target.closest('.trim')) return;   // the edge-trim handles own this gesture, not us
+      const startX = e.clientX;
+      let dragging = false;
+      try { seg.setPointerCapture(e.pointerId) } catch {}
+      const onMove = ev => {
+        if (!dragging) {
+          if (Math.abs(ev.clientX - startX) < 6) return;
+          dragging = true;
+          seg.classList.add('dragging');
+        }
+        const sibs = [...tlDiv.querySelectorAll(':scope > [data-i]')].filter(s => s !== seg);
+        const under = sibs.find(s => { const r = s.getBoundingClientRect(); return ev.clientX >= r.left && ev.clientX < r.right });
+        if (under) {
+          const r = under.getBoundingClientRect();
+          tlDiv.insertBefore(seg, ev.clientX < r.left + r.width / 2 ? under : under.nextSibling);
+        }
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        seg.classList.remove('dragging');
+        if (!dragging) return;   // negligible movement - let the normal click (selection) handle it
+        snapshotEdl();
+        const newOrder = [...tlDiv.querySelectorAll(':scope > [data-i]')].map(s => +s.dataset.i);
+        P.edl.clips = newOrder.map(i => P.edl.clips[i]);
+        selClip = selClip == null ? null : newOrder.indexOf(selClip);
+        clearMultiSel();
+        // most browsers never fire a 'click' after a real drag (enough pointer movement suppresses it
+        // natively), so this flag often has nothing to consume - self-clear it shortly instead of
+        // leaving it set forever, or it would silently eat the next unrelated, genuine click.
+        SUPPRESS_TL_CLICK = true;
+        setTimeout(() => { SUPPRESS_TL_CLICK = false }, 300);
+        saveEdl(); renderPlan();
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+  });
+}
+// ---------------- right-click context menu ----------------
+// A quick-access shortcut to actions that already exist as buttons elsewhere (Lock, Edit's delete,
+// the color sliders) - this never introduces a new capability, just a faster path to one, so there's
+// nothing here that isn't also reachable from the visible UI.
+function closeCtxMenu() { document.querySelector('.ctxMenu')?.remove() }
+function openClipContextMenu(x, y, idx) {
+  closeCtxMenu();
+  const c = P.edl.clips[idx];
+  if (!c) return;
+  const menu = document.createElement('div');
+  menu.className = 'ctxMenu';
+  const items = [
+    {label: c.locked ? '🔓 Unlock' : '🔒 Lock', run: () => { snapshotEdl(); c.locked = !c.locked; saveEdl(); renderPlan() }},
+    {label: '⧉ Duplicate', run: () => {
+      const copy = JSON.parse(JSON.stringify(c)); copy.locked = true; copy.transition_in = null;
+      if (c.in != null) {
+        // a video clip can't reuse the exact same in/out a second time (the same source range
+        // playing twice back to back is rejected as an overlap) - try right after the original
+        // first, then right before it; if neither fits in the source file, don't guess further.
+        const m = mediaOf(c.source) || {};
+        const dur = c.out - c.in;
+        if (c.out + dur <= (m.duration || 0) + 0.05) { copy.in = +c.out.toFixed(2); copy.out = +(c.out + dur).toFixed(2) }
+        else if (c.in - dur >= -0.05) { copy.out = +c.in.toFixed(2); copy.in = +Math.max(0, c.in - dur).toFixed(2) }
+        else {
+          $('#edlMsg').textContent = "Can't duplicate - no unused room left in this clip's source file"; $('#edlMsg').style.color = 'var(--err)';
+          return;
+        }
+      }
+      snapshotEdl();
+      P.edl.clips.splice(idx + 1, 0, copy);
+      selClip = idx + 1; clearMultiSel(); saveEdl(); renderPlan();
+    }},
+  ];
+  items.push({label: '⇄ Swap source', run: () => openSwapModal(idx)});
+  if (FEATURES.advancedClip && (c.brightness || c.contrast !== 1 || c.saturation !== 1 || c.warmth)) {
+    items.push({label: '↺ Reset color', run: () => {
+      snapshotEdl();
+      c.brightness = 0; c.contrast = 1; c.saturation = 1; c.warmth = 0; c.locked = true;
+      saveEdl(); renderPlan();
+    }});
+  }
+  items.push({label: '✕ Delete', danger: true, run: () => {
+    snapshotEdl();
+    P.edl.clips.splice(idx, 1);
+    if (selClip === idx) selClip = null;
+    clearMultiSel(); saveEdl(); renderPlan();
+  }});
+  menu.innerHTML = items.map((it, i) => `<button data-i="${i}" class="${it.danger ? 'danger' : ''}">${it.label}</button>`).join('');
+  document.body.appendChild(menu);
+  // clamp on-screen so a click near the right/bottom edge doesn't open an off-canvas menu
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+  menu.querySelectorAll('button').forEach((b, i) => b.onclick = () => { closeCtxMenu(); items[i].run() });
+}
+// These two are bound ONCE, globally, at script load - not re-added on every menu open. A one-shot
+// listener added per-open was tried first and had a real bug: right-click #1 arms a one-time
+// 'contextmenu' closer that hasn't fired yet when right-click #2 opens a NEW menu, so the stale
+// listener from #1 closes #2 the instant it appears. A permanent listener that checks the event's
+// own target has no such staleness window.
+document.addEventListener('click', e => { if (!e.target.closest('.ctxMenu')) closeCtxMenu() });
+document.addEventListener('contextmenu', e => { if (!e.target.closest('.tl > [data-i], .clip[data-i]')) closeCtxMenu() });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu() });
+function bindClipContextMenu(area) {
+  area.querySelectorAll('.tl > [data-i], .clip[data-i]').forEach(el => {
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      openClipContextMenu(e.clientX, e.clientY, +el.dataset.i);
+    });
+  });
+}
+// ---------------- swap clip source (keep position/color/locks/synced text - only footage + in/out change) ----------------
+function openSwapModal(idx) {
+  const c = P.edl.clips[idx];
+  if (!c) return;
+  const choices = P.media.filter(m => m.name !== c.source);
+  $('#swapGrid').innerHTML = choices.length ? choices.map(m => {
+    const orient = m.height > m.width ? '9:16' : '16:9';
+    const meta = m.kind === 'video' ? `${fmt(m.duration)}s · ${orient}` : `photo · ${orient}`;
+    return `<div class="card" data-n="${esc(m.name)}">
+      <img src="${thumb(m.name)}" loading="lazy" alt="">
+      <div class="nm" title="${esc(m.name)}">${esc(m.name)}</div><div class="mt">${meta}</div></div>`;
+  }).join('') : '<div class="empty" style="grid-column:1/-1">No other material uploaded yet - add more files first.</div>';
+  $('#swapGrid').querySelectorAll('.card').forEach(card => card.onclick = () => {
+    $('#swapModal').hidden = true;
+    swapClipSource(idx, mediaOf(card.dataset.n));
+  });
+  $('#swapModal').hidden = false;
+}
+$('#swapClose').onclick = () => { $('#swapModal').hidden = true };
+$('#swapModal').onclick = e => { if (e.target.id === 'swapModal') $('#swapModal').hidden = true };
+// A video source already used (unlocked range) by another clip can't be reused for an overlapping
+// stretch - same rule the server enforces (overlap_errors). Finds the first gap in that file long
+// enough for the wanted length; if none fits exactly, falls back to the single largest gap (clamped
+// down to it, never below the schema's 0.5s floor); returns null only when truly nothing is free.
+function findFreeSlot(source, wantLen, excludeIdx, totalDuration) {
+  const occ = P.edl.clips
+    .filter((c, i) => i !== excludeIdx && c.source === source && c.in != null)
+    .map(c => [c.in, c.out]).sort((a, b) => a[0] - b[0]);
+  const gaps = [];
+  let cursor = 0;
+  occ.forEach(([a, b]) => { if (a - cursor > 0.001) gaps.push([cursor, a]); cursor = Math.max(cursor, b) });
+  gaps.push([cursor, totalDuration]);
+  const fits = gaps.find(([a, b]) => b - a >= wantLen + 0.05);
+  if (fits) return [+fits[0].toFixed(2), +(fits[0] + wantLen).toFixed(2)];
+  const largest = gaps.reduce((mx, g) => (g[1] - g[0] > mx[1] - mx[0] ? g : mx), [0, 0]);
+  return (largest[1] - largest[0] >= 0.5) ? [+largest[0].toFixed(2), +largest[1].toFixed(2)] : null;
+}
+function swapClipSource(idx, m) {
+  const c = P.edl.clips[idx];
+  if (!c || !m) return;
+  const oldOnscreen = clipDur(c);
+  const speed = c.speed || 1;
+  let slot = null;
+  if (m.kind === 'video') {
+    const wantLen = Math.max(0.5, Math.min(oldOnscreen * speed, m.duration || oldOnscreen * speed));
+    slot = findFreeSlot(m.name, wantLen, idx, m.duration || wantLen);
+    if (!slot) { showEdlMsg(`Can't swap to ${m.name} - no unused room left in that file (it's already fully used elsewhere on the timeline).`, true); return }
+  }
+  snapshotEdl();
+  c.source = m.name;
+  if (m.kind === 'video') {
+    c.speed = speed;
+    c.in = slot[0]; c.out = slot[1];
+    delete c.duration;
+  } else {
+    delete c.in; delete c.out;
+    c.speed = 1;   // speed only applies to video clips - the server rejects a non-1 speed on a photo
+    c.duration = +Math.max(2, Math.min(4, oldOnscreen)).toFixed(2);
+    if (!c.motion) c.motion = 'zoom_in';
+  }
+  c.locked = true;
+  showEdlMsg(`Swapped to ${m.name} - check the new in/out before you render.`, false);
   saveEdl(); renderPlan();
 }
 // Drag-trim: pulling a clip's left/right edge on the timeline bar changes its in/out (video)
@@ -1042,6 +1846,31 @@ $('#fcpBtn').onclick = async () => {
 };
 $('#draftBtn').onclick = () => doRender(false);
 $('#finalBtn').onclick = () => doRender(true);
+
+// ---------------- quick preview (task A1 - cached, low-res, re-encodes only changed clips) ----------------
+// Deliberately NOT a true frame-by-frame live/real-time preview - that would mean a whole separate
+// client-side compositor (stacked <video> elements, CSS/WebGL color filters, Web Audio mixing...)
+// built well enough to stay faithful to what render() actually produces, which is a lot of surface
+// area to keep in sync with every future EDL feature. This instead makes the EXISTING server render
+// path fast enough to feel instant for iterating: proxy media + a segment cache (render_preview in
+// render.py) so only the clip(s) you just changed get re-encoded - what you see is always exactly
+// what render() would produce, just smaller and (after the first pass) much quicker.
+let PREVIEW_INFLIGHT = false;
+const triggerPreview = debounce(async () => {
+  if (!P.edl || PREVIEW_INFLIGHT) return;
+  PREVIEW_INFLIGHT = true;
+  if ($('#previewBtn')) $('#previewBtn').disabled = true;
+  try {
+    await saveEdl.flush();
+    const {job} = await api(`/api/projects/${P.id}/preview`, {method: 'POST'});
+    const r = await waitJob(job, '#previewStatus', 'Quick preview');
+    $('#player').src = r.url; $('#player').play().catch(() => {});
+    alertStatus('#previewStatus', `Preview ready in ${r.seconds}s`, false, true);
+  } catch (e) { alertStatus('#previewStatus', e.message, true) }
+  PREVIEW_INFLIGHT = false;
+  if ($('#previewBtn')) $('#previewBtn').disabled = false;
+}, 900);
+$('#previewBtn').onclick = () => { if (!P.edl) return alertStatus('#previewStatus', 'Generate a plan first', true); triggerPreview() };
 
 // ---------------- keyboard shortcuts ----------------
 // Space/J/K/L act on whichever preview video has something loaded: the per-file hint preview

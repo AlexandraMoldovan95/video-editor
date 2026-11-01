@@ -1,18 +1,28 @@
+# Secrets - never commit your real key
 .env
-output/
-_to_delete/
+
+# Python
 __pycache__/
-*.mp4
-*.jpg
-*.png
+*.pyc
+.venv/
+venv/
+
+# Your own projects: personal photos/videos, generated drafts/finals, caches.
+# None of this belongs in a public repo - it's your own media, not source code.
 projects/
 
-# internal dev notes / original brief - not part of the public project
-CLAUDE.md
-Propunere_26.10.docx
-*.mp3
+# Loose demo/sample footage dropped at the project root for local testing.
+# (Bundled assets the app actually ships with - app/assets/, app/fonts/,
+# docs/media/, edl_examples/ - are NOT covered by these root-only rules.)
+/*.mp4
+/*.jpg
+/*.jpeg
 material_test/
-edl_examples/*_DELETE*
-.gitignore_write_test_DELETE
-*_stale_DELETE/
-*_stale_DELETE
+output/
+
+# Personal/working documents that aren't part of the project.
+Propunere_26.10.docx
+
+# OS cruft
+.DS_Store
+Thumbs.db

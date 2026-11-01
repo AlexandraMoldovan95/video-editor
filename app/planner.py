@@ -46,8 +46,15 @@ CLIP_SCHEMA = {
             "properties": {"type": {"enum": TRANSITIONS_SUBTLE + TRANSITIONS_DYNAMIC},
                            "duration": {"type": "number", "minimum": 0.15, "maximum": 1.0}},
             "required": ["type", "duration"]},
+        "reason": {"type": "string", "maxLength": 200,
+                   "description": "ONE short sentence: why THIS clip, THIS cut, in THIS position - "
+                                  "not a repeat of the global 'reasoning'."},
+        "low_confidence": {"type": "boolean",
+                           "description": "true if you're NOT confident about this exact cut - fast motion, "
+                                          "action-heavy, motion blur, or an ambiguous moment where the frames "
+                                          "don't give you enough to judge precisely. false when you're sure."},
     },
-    "required": ["source", "fit", "brightness", "contrast", "saturation", "warmth"],
+    "required": ["source", "fit", "brightness", "contrast", "saturation", "warmth", "reason", "low_confidence"],
 }
 TEXT_SCHEMA = {
     "type": "object",
@@ -56,8 +63,18 @@ TEXT_SCHEMA = {
         "start": {"type": "number"}, "end": {"type": "number"},
         "position": {"enum": ["top", "center", "bottom"]},
         "style": {"enum": ["title", "caption", "cta"]},
+        "variants": {
+            "type": "array", "items": {"type": "string", "maxLength": 80}, "maxItems": 2,
+            "description": "ONLY for the opening hook (the first title-style text): 1-2 alternate "
+                           "wordings of the same hook, same meaning/length ballpark, different angle "
+                           "(e.g. question vs statement vs curiosity gap), so the user can A/B test it. "
+                           "Leave empty for every other text.",
+        },
+        "reason": {"type": "string", "maxLength": 200,
+                   "description": "ONE short sentence: why this text, this wording, this placement/timing - "
+                                  "not a repeat of the global 'reasoning'."},
     },
-    "required": ["content", "start", "end", "position", "style"],
+    "required": ["content", "start", "end", "position", "style", "reason"],
 }
 TOOL = {
     "name": "submit_edl",
@@ -65,7 +82,9 @@ TOOL = {
     "input_schema": {
         "type": "object",
         "properties": {
-            "reasoning": {"type": "string", "description": "2-4 sentences: why this order and these cuts"},
+            "reasoning": {"type": "string", "description": "2-4 sentences: the GLOBAL overview - why this "
+                                                            "order/arc overall. Per-clip/per-text detail goes "
+                                                            "in each item's own 'reason' field instead."},
             "clips": {"type": "array", "items": CLIP_SCHEMA, "minItems": 1},
             "texts": {"type": "array", "items": TEXT_SCHEMA, "description": "on-screen texts, times on the final video"},
         },
@@ -86,6 +105,9 @@ Strict rules:
 - The same clip can be used more than once only with intervals that do NOT overlap.
 - Horizontal clips get the fit from the preset; vertical ones get "crop_center".
 - Color: start from the look's base values and adjust per clip only as much as needed for everything to look consistent.
+  If an example video is attached below, ITS color grade is the real target: match its warmth, contrast and
+  saturation mood as closely as the brightness/contrast/saturation/warmth ranges allow, even where that means
+  drifting from the preset's base numbers.
 - The user's per-file settings are MANDATORY and take priority over the preset.
 - Original sound: clips WITH SOUND keep their sound (volume 1). Only set volume 0 if the user asks for it,
   or if the sound would hurt the result (e.g. wind over a musical moment). If a transcript exists, do NOT cut
@@ -93,8 +115,19 @@ Strict rules:
 - Transitions: a transition lasts at most 40% of the clips it joins. It doesn't change the total duration.
 - Texts: times are on the FINAL video (second 0 = the start). Short, natural, no marketing cliches;
   if the user gave no context (the place, the occasion), write generic but understated texts, don't invent names or facts.
+  If an example video is attached below and it shows on-screen text/captions, match ITS general style - tone,
+  capitalization, density (how often text appears), placement - never its exact wording, only the style.
+- Opening hook: for the FIRST title-style text only, also fill "variants" with 1-2 alternate wordings
+  (same idea, different angle) so the user can flip between options without regenerating. Leave
+  "variants" empty for every other text.
 - Order: build an arc (strong opening, rhythm, memorable ending). Choose the moments based on the frames.
-- Write "reasoning" in English."""
+- Per-item "reason": every clip and every text also gets its OWN one-sentence "reason" field -
+  specific to that item (why this exact moment/cut, why this order, why this wording/timing), never
+  a copy-paste of the global "reasoning" or of another item's reason.
+- Per-clip "low_confidence": be HONEST about it. Fast motion, action-heavy footage, motion blur, or
+  frames too sparse/ambiguous to judge the exact in/out precisely all deserve low_confidence=true -
+  don't mark everything confident just to look decisive. Most calm/clear clips are low_confidence=false.
+- Write "reasoning" (the short global overview) and every "reason" in English."""
 
 
 def _img_block(path: Path) -> dict:
@@ -145,11 +178,15 @@ def build_request(media: dict[str, MediaInfo], preset_name: str, overrides: dict
         f"- target duration: {target:.1f}s" + (f" (out of {preset.target_duration}s, {locked_total:.1f}s is already locked by the user)" if locked else ""),
         f"- cut length: between {cut_range[0]}s and {cut_range[1]}s"
         + (f" (measured from the example video: median {rhythm.median}s)" if rhythm and "pace" not in overrides else ""),
-        f"- color look: {preset.color_look} -> base values {json.dumps(COLOR_BASE[preset.color_look])}",
+        f"- color look: {preset.color_look} -> base values {json.dumps(COLOR_BASE[preset.color_look])}"
+        + (" (but see the example video below: match ITS color grade over these base numbers if they differ)"
+           if example and "color_look" not in overrides else ""),
         f"- fit for horizontal clips: {preset.vertical_fit}",
         f"- photo motion: {preset.photo_motion}",
         f"- transitions: {TRANSITION_RULES[preset.transition_style]}",
-        f"- on-screen text: {TEXT_RULES[preset.text_style]}",
+        f"- on-screen text: {TEXT_RULES[preset.text_style]}"
+        + (" (but see the example video below: if it has on-screen text, match its style/tone, not its wording)"
+           if example and "text_style" not in overrides else ""),
     ]
     if preset.notes:
         spec.append(f"- the user's notes: {preset.notes}")
@@ -182,7 +219,9 @@ def build_request(media: dict[str, MediaInfo], preset_name: str, overrides: dict
 
     if example:
         ex_frames = extract_frames(probe(example), frames_dir / "_example")
-        content.append({"type": "text", "text": "## Example video (the desired visual style: color, framing)"})
+        content.append({"type": "text", "text": "## Example video (the target style to match: color grade, "
+                        "framing, AND on-screen text style/tone if it has captions - on top of the cut pace "
+                        "already measured above)"})
         content += [_img_block(f.path) for f in ex_frames]
 
     meta = {"preset": preset.model_dump(), "cut_range": cut_range, "target_free": target,
@@ -282,11 +321,185 @@ def plan(media: dict[str, MediaInfo], preset_name: str = "neutral", overrides: d
     return {"edl": edl, "reasoning": reasoning, "usage": usage, "meta": meta}
 
 
+# ---------------- multiple draft variants in one generation ----------------
+# Reuses the SAME extracted frames (the expensive part) for every variant - only the final
+# instruction block differs, nudging each call toward a structurally different take rather than
+# just a reshuffle of the same cuts. Each variant still goes through the normal finalize()
+# validation/retry loop independently, so one variant failing doesn't take the others down with it.
+VARIANT_ANGLES = [
+    "## This generation\nVariant A: your single best edit - whatever structure you think serves this material best.",
+    "## This generation\nVariant B: a STRUCTURALLY different take from variant A - a different opening, a different "
+    "pace, or a different subset/order of the moments. Don't just reshuffle the same cuts with the same shape.",
+    "## This generation\nVariant C: a third, again structurally distinct take from both A and B - a different arc, "
+    "a different emphasis, or a different selection of material.",
+]
+
+
+def plan_variants(media: dict[str, MediaInfo], preset_name: str = "neutral", overrides: dict | None = None,
+                  example: Path | None = None, file_hints: dict[str, FileHint] | None = None,
+                  current: EDL | None = None, music: dict | None = None,
+                  transcripts: dict | None = None, n: int = 3) -> list[dict]:
+    """Returns up to n variants: [{"label", "edl", "reasoning", "usage"} | {"label", "error"}, ...].
+    Raises only if EVERY variant failed."""
+    import concurrent.futures
+    file_hints = file_hints or {}
+    locked = [(i, c) for i, c in enumerate(current.clips) if c.locked] if current else []
+    locked_texts = [t for t in current.texts if t.locked] if current else []
+    n = max(1, min(n, len(VARIANT_ANGLES)))
+    grid = music_grid(music)
+
+    def run_one(label: str, angle: str, content: list[dict]) -> dict:
+        msgs = [{"role": "user", "content": content + [{"type": "text", "text": angle}]}]
+        try:
+            edl, reasoning, usage = call_claude(msgs, media, file_hints, locked, grid, locked_texts)
+            return {"label": label, "edl": edl, "reasoning": reasoning, "usage": usage}
+        except Exception as e:  # noqa: BLE001
+            return {"label": label, "error": str(e)}
+
+    with tempfile.TemporaryDirectory(prefix="vedit_frames_") as tmp:
+        messages, _meta = build_request(media, preset_name, overrides or {}, example, Path(tmp),
+                                        file_hints, locked, music, locked_texts, transcripts)
+        base_content = messages[0]["content"]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
+            futs = [ex.submit(run_one, chr(65 + i), VARIANT_ANGLES[i], base_content) for i in range(n)]
+            results = [f.result() for f in futs]
+    results.sort(key=lambda r: r["label"])
+    if not any("edl" in r for r in results):
+        raise RuntimeError("All variants failed: " + "; ".join(r.get("error", "?") for r in results))
+    return results
+
+
+# ---------------- deep scan: a close re-look at ONE clip with many more frames ----------------
+# Opt-in, per-clip: the first pass only sends FRAMES_PER_CLIP (4) frames per file, which is plenty for
+# most footage but can miss the right moment in fast/action-heavy material. This re-extracts DEEPSCAN_FRAMES
+# frames across a window around the clip's current cut and asks the AI to refine just that one clip.
+DEEPSCAN_FRAMES = 20
+
+DEEPSCAN_CLIP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "in": {"type": "number", "description": "refined start second, in the SOURCE file's own time"},
+        "out": {"type": "number", "description": "refined end second, in the SOURCE file's own time"},
+        "brightness": {"type": "number", "minimum": -0.3, "maximum": 0.3},
+        "contrast": {"type": "number", "minimum": 0.5, "maximum": 2.0},
+        "saturation": {"type": "number", "minimum": 0.0, "maximum": 3.0},
+        "warmth": {"type": "number", "minimum": -0.2, "maximum": 0.2},
+        "reason": {"type": "string", "maxLength": 200, "description": "one short sentence on this refined choice"},
+        "low_confidence": {"type": "boolean",
+                           "description": "after this much closer look, are you STILL not sure? usually false now - "
+                                          "only keep it true if even 20 frames can't resolve the ambiguity."},
+    },
+    "required": ["in", "out", "brightness", "contrast", "saturation", "warmth", "reason", "low_confidence"],
+}
+DEEPSCAN_TOOL = {
+    "name": "submit_clip",
+    "description": "Submits the refined cut + color for this one clip, after a close look at many more frames.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"clip": DEEPSCAN_CLIP_SCHEMA},
+        "required": ["clip"],
+    },
+}
+DEEPSCAN_SYSTEM = """You are a video editor doing a CLOSE REVIEW of a single clip you cut earlier.
+The user asked for a deeper look because this moment is fast/action-heavy or otherwise hard to judge from a
+handful of frames. You now get many more frames, spread across a wider window around your original cut, from
+the same source file.
+Re-examine and refine ONLY this clip:
+- Pick the best possible exact "in"/"out" in the source file's own time. It's fine to keep it the same as
+  before if it's already right, or to shift it - don't change it just to look busy.
+- Aim to keep roughly the same on-screen duration as the current cut unless the material clearly calls for
+  a different length; a wildly different duration would throw off the rest of the timeline.
+- Refine brightness/contrast/saturation/warmth only if the extra frames reveal something the first pass missed.
+- Submit your answer ONLY through the submit_clip tool, with no other text.
+- Write "reason" (one short sentence) and be honest in "low_confidence": most of the time this closer look
+  resolves the uncertainty, so it should now be false; keep it true only if it genuinely still can't be judged."""
+
+
+def build_deepscan_request(info: MediaInfo, clip: Clip, frames_dir: Path) -> tuple[list[dict], dict]:
+    cur_len = clip.out - clip.in_
+    pad = max(1.0, cur_len * 0.5)
+    t0 = max(0.0, clip.in_ - pad)
+    t1 = min(info.duration, clip.out + pad)
+    frames = extract_frames(info, frames_dir, n=DEEPSCAN_FRAMES, t0=t0, t1=t1)
+    lines = [
+        "## Clip under review",
+        f"- file: {clip.source}, {info.duration:.2f}s total, {info.width}x{info.height}",
+        f"- your current cut: {clip.in_:.2f}-{clip.out:.2f}s ({cur_len:.2f}s on screen)",
+        f"- current color: brightness={clip.brightness} contrast={clip.contrast} saturation={clip.saturation} warmth={clip.warmth}",
+        f"- {len(frames)} frames below, evenly spread across {t0:.2f}-{t1:.2f}s (a window around your current cut)",
+    ]
+    content: list[dict] = [{"type": "text", "text": "\n".join(lines)}]
+    for f in frames:
+        content.append({"type": "text", "text": f"{f.source} @ {f.timestamp}s"})
+        content.append(_img_block(f.path))
+    meta = {"t0": t0, "t1": t1, "images": len(frames)}
+    return [{"role": "user", "content": content}], meta
+
+
+def deep_scan_clip(media: dict[str, MediaInfo], clip: Clip, frames_dir: Path) -> tuple[Clip, dict]:
+    """Re-examines ONE clip with many more frames and returns a refined, already-locked Clip."""
+    import anthropic
+    from dotenv import load_dotenv
+    load_dotenv()
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
+    if clip.in_ is None or clip.out is None:
+        raise ValueError("deep scan only applies to a video clip, not a photo")
+    info = media.get(clip.source)
+    if info is None or info.kind != "video":
+        raise ValueError(f"deep scan: source file not found or not a video: {clip.source!r}")
+
+    messages, meta = build_deepscan_request(info, clip, frames_dir)
+    client = anthropic.Anthropic()
+    usage = {"input_tokens": 0, "output_tokens": 0}
+
+    for attempt in range(MAX_RETRIES + 1):
+        resp = client.messages.create(model=MODEL, max_tokens=1000, system=DEEPSCAN_SYSTEM, messages=messages,
+                                      tools=[DEEPSCAN_TOOL], tool_choice={"type": "auto"})
+        usage["input_tokens"] += resp.usage.input_tokens
+        usage["output_tokens"] += resp.usage.output_tokens
+        block = next((b for b in resp.content if b.type == "tool_use"), None)
+        if block is None:
+            if attempt == MAX_RETRIES:
+                raise RuntimeError("The AI did not call submit_clip")
+            messages = messages + [{"role": "assistant", "content": resp.content},
+                                   {"role": "user", "content": "Send your answer ONLY through the submit_clip tool."}]
+            continue
+        raw = block.input.get("clip") or {}
+        try:
+            if raw.get("in") is None or raw.get("out") is None:
+                raise ValueError("missing in/out")
+            if not (raw["in"] < raw["out"] <= info.duration + 0.05):
+                raise ValueError(f"invalid interval {raw['in']}-{raw['out']} (duration {info.duration:.2f}s)")
+            if raw["out"] - raw["in"] < 0.5:
+                raise ValueError("cut too short (<0.5s)")
+            data = clip.model_dump(by_alias=True, exclude_none=True)
+            data.update({
+                "in": round(raw["in"], 2), "out": round(raw["out"], 2),
+                "brightness": raw["brightness"], "contrast": raw["contrast"],
+                "saturation": raw["saturation"], "warmth": raw["warmth"],
+                "reason": raw.get("reason"), "low_confidence": bool(raw.get("low_confidence", False)),
+                "locked": True,
+            })
+            updated = Clip.model_validate(data)
+            return updated, usage
+        except Exception as e:  # noqa: BLE001
+            if attempt == MAX_RETRIES:
+                raise
+            print(f"  invalid deep-scan answer, asking for a correction: {e}")
+            messages = messages + [
+                {"role": "assistant", "content": resp.content},
+                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": block.id, "is_error": True,
+                                              "content": f"{e}\nCorrect it and resend."}]},
+            ]
+    raise RuntimeError("unreachable")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Generates an edit plan with Claude.")
     ap.add_argument("--input", default=".", help="the folder with the raw material")
     ap.add_argument("--preset", default="neutral", choices=list(PRESETS))
-    ap.add_argument("--duration", type=int, choices=[15, 30, 45, 60])
+    ap.add_argument("--duration", type=int, help="target duration in seconds, 5-120")
     ap.add_argument("--pace", choices=["slow", "medium", "fast"])
     ap.add_argument("--look", dest="color_look", choices=list(COLOR_BASE))
     ap.add_argument("--notes", default="")
