@@ -1,0 +1,16 @@
+# Runs the tests for the edit-plan validation (tests/test_edl.py) on every push and pull request.
+# They only need pydantic: no ffmpeg, no API key, nothing secret.
+name: tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  edl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pydantic>=2.6" pytest
+      - run: python -m pytest -q

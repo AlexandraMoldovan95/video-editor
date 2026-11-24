@@ -83,6 +83,7 @@ uvicorn app.main:app --port 8000      # -> http://localhost:8000
 python -m app.render edl_examples/test_manual.json            # draft, half resolution
 python -m app.render edl_examples/test_manual.json --final    # full 1080x1920
 python -m app.planner --preset travel_cinematic --dry-run     # see the prompt, no API call
+python -m pytest -q                                           # tests for the plan validation (tests/test_edl.py); CI runs them on every push
 ```
 
 **The server runs without `--reload`.** Any change to backend code (`app/*.py`) needs a manual restart to take effect.

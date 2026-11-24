@@ -308,7 +308,7 @@
         </div>
         <div class="feature-block">
           <h3>Quality</h3>
-          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. No automated test suite yet — the honest gap next to this project's others.</p>
+          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. The edit-plan validation has 27 automated tests that run on every push; rendering, audio and the UI are still tested by hand.</p>
         </div>
         <div class="feature-block">
           <h3>Architecture</h3>
@@ -335,7 +335,7 @@
       <ul class="limits">
         <li><strong>The AI only sees 4 frames per clip.</strong> It picks well on calm footage but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.</li>
         <li><strong>Beat tracking is tested on synthetic tracks</strong> (128 and 95 BPM, ~22ms error). On music without a clear drum hit it can get it wrong — turn off "On beat" for that track.</li>
-        <li><strong>No automated test suite yet.</strong> Every stage is tested by hand instead — thorough, but it doesn't scale the way an automated suite would.</li>
+        <li><strong>Automated tests cover only the plan validation.</strong> The 27 tests check the code that validates the AI's plan; rendering, audio and the UI are still tested by hand — thorough, but it doesn't scale the way an automated suite would.</li>
         <li><strong>Whisper subtitles and the DaVinci export are implemented but untested on a normal install.</strong> The model download was blocked in the sandboxed environment this was built in — the logic was verified with a simulated transcript and validated against OpenTimelineIO, but neither has run for real yet.</li>
       </ul>
     </div>

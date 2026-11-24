@@ -17,7 +17,7 @@
 |---|---|
 | **What** | Local web app: FastAPI backend, single-file JS frontend, ffmpeg for rendering, Claude for the editing decisions. Windows. |
 | **My role** | Product idea, UX, the "AI decides, code executes" architecture, and all testing. Built in pair-programming with Claude — see [How it was built](#how-it-was-built). |
-| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). No automated test suite yet. |
+| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). The edit-plan validation (the code that checks the AI's JSON before anything renders) has 27 automated tests in [`tests/test_edl.py`](tests/test_edl.py), run in CI on every push; rendering, audio and the UI are still tested by hand. |
 | **Status** | Personal/portfolio project, all planned features implemented. Two (Whisper subtitles, DaVinci import) are still untested on a normal install — see [Known limitations](#known-limitations-honest). |
 
 ## Why it exists
