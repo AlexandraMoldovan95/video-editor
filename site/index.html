@@ -50,6 +50,12 @@
   .nav-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
   .nav-links a{color:var(--muted);font-size:13.5px;}
   .nav-links a:hover{color:var(--text);text-decoration:none;}
+  /* Phones: the six links wrapped onto two lines (GitHub alone on the second). The two links to
+     sections of this same page are dropped there; their content is right below anyway. */
+  @media (max-width:560px){
+    .nav-links{gap:14px;}
+    .nav-links .nav-section{display:none;}
+  }
 
   /* hero */
   .hero{padding:52px 0 36px;}
@@ -65,6 +71,16 @@
   .stats-row{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:30px;}
   .stat b{display:block;font-size:22px;color:var(--text);}
   .stat span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;max-width:160px;}
+  /* Wide screens: the real vertical output plays beside the text, so the hero shows the result,
+     not an empty right half. Narrow screens: hidden here (the same video is in "Play with it"). */
+  .hero-grid{display:grid;grid-template-columns:1fr;align-items:center;}
+  .hero-reel{display:none;margin:0 0 30px;}
+  @media (min-width:900px){
+    .hero-grid{grid-template-columns:minmax(0,1fr) 230px;gap:48px;}
+    .hero-reel{display:block;}
+  }
+  .hero-reel video{width:100%;aspect-ratio:9/16;display:block;border-radius:14px;border:1px solid var(--line);background:#000;box-shadow:0 20px 50px -20px rgba(0,0,0,.6);}
+  .hero-reel figcaption{font-size:12.5px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.45;}
   .hero-media{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 20px 50px -20px rgba(0,0,0,.6);}
   .hero-media img{width:100%;display:block;}
 
@@ -168,8 +184,8 @@
     <div class="nav-links">
       <a href="https://alexandra-moldovan.netlify.app/#portfolio">← Portfolio</a>
       <a href="#demo">Try it</a>
-      <a href="#features">What it does</a>
-      <a href="#role">My role</a>
+      <a href="#features" class="nav-section">What it does</a>
+      <a href="#role" class="nav-section">My role</a>
       <a href="https://alexandra-moldovan.netlify.app/projects/video-editor.html">Write-up</a>
       <a href="https://github.com/AlexandraMoldovan95/video-editor" target="_blank" rel="noopener">GitHub</a>
     </div>
@@ -179,6 +195,8 @@
 <main id="top">
   <section class="hero reveal" style="border-top:none;">
     <div class="wrap">
+      <div class="hero-grid">
+      <div class="hero-text">
       <div class="eyebrow">Python · FastAPI · ffmpeg · local web app</div>
       <h1>Video Editor</h1>
       <p class="pitch">Turns raw clips and photos into a finished vertical (9:16) video for social media. <strong>Claude proposes the cut</strong>, the color and the on-screen text — the code validates the plan and renders it with ffmpeg, so the AI never touches ffmpeg directly. You stay in control: change or lock anything before it renders.</p>
@@ -192,6 +210,15 @@
         <div class="stat"><b>~2 min</b><span>for a first draft, vs. ~1 hour hand-editing the same 30s clip</span></div>
         <div class="stat"><b>4</b><span>real crash/data-loss bugs found and fixed in a dedicated robustness audit</span></div>
         <div class="stat"><b>3</b><span>ready-made demo plans below, no API key needed</span></div>
+      </div>
+      </div>
+
+      <figure class="hero-reel">
+        <video src="images/video-editor-demo/draft.mp4" poster="images/video-editor-demo/draft-poster.jpg"
+               muted loop playsinline autoplay preload="metadata"
+               aria-label="A vertical video made by the app from the sample clips"></video>
+        <figcaption>Real output: the rendered draft of the "Cinematic travel story" plan</figcaption>
+      </figure>
       </div>
 
       <div class="hero-media">
@@ -473,6 +500,17 @@ function renderPlan(key){
 
 renderMaterial();
 renderPlan("travel_story");
+
+// Hero reel plays muted on a loop, except for people who asked their system to reduce motion:
+// for them it stays on its first frame, with controls to play it by choice.
+(function () {
+  const reel = document.querySelector(".hero-reel video");
+  if (reel && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    reel.removeAttribute("autoplay");
+    reel.pause();
+    reel.controls = true;
+  }
+})();
 
 // Subtle scroll-reveal for each section - fade up into view once, same pattern as the portfolio
 // site (visible-by-default if JS doesn't run or IntersectionObserver is missing, plus a safety
