@@ -124,6 +124,19 @@ def test_an_invalid_plan_is_sent_back_once_with_the_reason(media):
     assert "file does not exist 'missing.mp4'" in correction["content"]
 
 
+def test_two_tool_calls_in_one_reply_each_get_an_answer_in_the_correction(media):
+    # The API rejects a turn that leaves a tool_use without its tool_result (HTTP 400),
+    # so the correction must answer both calls, not only the one that was checked.
+    client = FakeClient(reply(tool_call(BAD_PLAN, id="toolu_a"), tool_call(GOOD_PLAN, id="toolu_b")),
+                        reply(tool_call(GOOD_PLAN, id="toolu_c")))
+    planner.call_claude(ASK, media, {}, [], client=client)
+    results = client.requests[1]["messages"][-1]["content"]
+    assert [r["tool_use_id"] for r in results] == ["toolu_a", "toolu_b"]
+    assert all(r["type"] == "tool_result" and r["is_error"] is True for r in results)
+    assert "missing.mp4" in results[0]["content"]
+    assert results[1]["content"] == "Ignored: send a single call."
+
+
 def test_a_plan_still_invalid_after_the_correction_raises_the_validation_error(media):
     client = FakeClient(reply(tool_call(BAD_PLAN)), reply(tool_call(BAD_PLAN, id="toolu_2")))
     with pytest.raises(ValueError, match="missing.mp4"):
@@ -196,6 +209,15 @@ def test_deep_scan_cut_past_the_end_of_the_file_is_sent_back_once(media, no_fram
     correction = client.requests[1]["messages"][-1]["content"][0]
     assert correction["tool_use_id"] == "toolu_bad" and correction["is_error"] is True
     assert "invalid interval" in correction["content"]
+
+
+def test_deep_scan_two_tool_calls_each_get_an_answer_in_the_correction(media, no_frames, tmp_path):
+    client = FakeClient(reply(answer(2.0, 12.0, id="toolu_a"), answer(2.0, 5.0, id="toolu_b")),
+                        reply(answer(2.0, 5.0, id="toolu_c")))
+    planner.deep_scan_clip(media, Clip.model_validate(CLIP), tmp_path, client=client)
+    results = client.requests[1]["messages"][-1]["content"]
+    assert [r["tool_use_id"] for r in results] == ["toolu_a", "toolu_b"]
+    assert "invalid interval" in results[0]["content"]
 
 
 def test_deep_scan_cut_too_short_twice_raises(media, no_frames, tmp_path):

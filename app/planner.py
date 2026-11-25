@@ -47,7 +47,24 @@ def make_client():
     load_dotenv()
     if not os.getenv("ANTHROPIC_API_KEY"):
         raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
-    return anthropic.Anthropic()
+    # Stated explicitly instead of relying on the SDK defaults. A plan with thinking can
+    # legitimately take minutes (the reply arrives in one piece), so the total wait stays at
+    # 10 minutes; a connection that can't even be opened fails after 10 seconds. The SDK
+    # retries connection errors, 408/409/429 and 5xx twice, with backoff.
+    return anthropic.Anthropic(timeout=anthropic.Timeout(600.0, connect=10.0), max_retries=2)
+
+
+def correction_turn(resp, block, error: Exception) -> list[dict]:
+    """The two messages that send a validation error back to the model.
+    The API needs a tool_result for EVERY tool_use in the reply (otherwise the correction
+    call fails with a 400), so `block`, the call that was checked, gets the error and any
+    extra calls get a short "ignored" result."""
+    results = [{"type": "tool_result", "tool_use_id": block.id, "is_error": True,
+                "content": f"{error}\nCorrect it and resend."}]
+    results += [{"type": "tool_result", "tool_use_id": b.id, "is_error": True,
+                 "content": "Ignored: send a single call."}
+                for b in resp.content if b.type == "tool_use" and b.id != block.id]
+    return [{"role": "assistant", "content": resp.content}, {"role": "user", "content": results}]
 
 CLIP_SCHEMA = {
     "type": "object",
@@ -313,11 +330,7 @@ def call_claude(messages: list[dict], media: dict, file_hints: dict[str, FileHin
             if attempt == MAX_RETRIES:
                 raise
             print(f"  invalid plan, asking for a correction: {e}")
-            messages = messages + [
-                {"role": "assistant", "content": resp.content},
-                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": block.id, "is_error": True,
-                                              "content": f"{e}\nCorrect it and resend."}]},
-            ]
+            messages = messages + correction_turn(resp, block, e)
     raise RuntimeError("unreachable")
 
 
@@ -503,11 +516,7 @@ def deep_scan_clip(media: dict[str, MediaInfo], clip: Clip, frames_dir: Path,
             if attempt == MAX_RETRIES:
                 raise
             print(f"  invalid deep-scan answer, asking for a correction: {e}")
-            messages = messages + [
-                {"role": "assistant", "content": resp.content},
-                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": block.id, "is_error": True,
-                                              "content": f"{e}\nCorrect it and resend."}]},
-            ]
+            messages = messages + correction_turn(resp, block, e)
     raise RuntimeError("unreachable")
 
 
