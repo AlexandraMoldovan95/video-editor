@@ -93,6 +93,7 @@ python -m pytest -q                                           # tests for the pl
 - 4 frames per clip (midpoint of each quarter), 512px wide, JPEG; photos send 1 frame. An example video also sends 4 frames, for visual style.
 - Claude answers through a `submit_edl` tool with `tool_choice: "auto"` (the model used here doesn't accept a forced `tool_choice`). If it answers with plain text instead, the request is retried once.
 - The response goes through `validate_edl`; on failure, the validation error is sent back once for a correction.
+- A reply cut off at the token limit, or refused, is reported as exactly that (`check_stop`), instead of being validated as a "wrong plan" and using up the one correction. The model thinks by default and thinking counts toward `max_tokens`, so the limits leave room for it: 16,000 for the plan, 4,000 for a deep scan.
 - Color warmth (-0.2..0.2) is implemented as `eq` filter `gamma_r`/`gamma_b` adjustments.
 - Locked clips are **not** sent to the AI for modification — only the free clips are generated, and the locked ones are reinserted at their original positions afterward, with an overlap check.
 - **Deep scan**: for one ambiguous clip, a second call re-examines it with 20 frames (vs. 4 in the first pass) across a wider window and refines just that cut.

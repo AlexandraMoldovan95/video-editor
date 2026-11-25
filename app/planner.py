@@ -25,6 +25,29 @@ from .render import scan_media
 
 MODEL = "claude-sonnet-5-5"
 MAX_RETRIES = 1
+# This model thinks by default (adaptive thinking), and thinking counts toward max_tokens,
+# so the limits leave room for it on top of the tool call itself.
+MAX_TOKENS_PLAN = 16000
+MAX_TOKENS_DEEPSCAN = 4000
+
+
+def check_stop(resp, what: str) -> None:
+    """A cut-off or refused answer is reported as such, instead of failing validation as a
+    "wrong plan" and using up the one correction retry on a reply that was never complete."""
+    if resp.stop_reason == "max_tokens":
+        raise RuntimeError(f"The AI's {what} was cut off at the token limit "
+                           f"({resp.usage.output_tokens} output tokens). Try again with fewer clips.")
+    if resp.stop_reason == "refusal":
+        raise RuntimeError(f"The AI declined to produce the {what}.")
+
+
+def make_client():
+    import anthropic
+    from dotenv import load_dotenv
+    load_dotenv()
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
+    return anthropic.Anthropic()
 
 CLIP_SCHEMA = {
     "type": "object",
@@ -266,20 +289,16 @@ def music_grid(music: dict | None):
 
 def call_claude(messages: list[dict], media: dict, file_hints: dict[str, FileHint],
                 locked: list[tuple[int, Clip]], grid=None,
-                locked_texts: list[TextItem] | None = None) -> tuple[EDL, str, dict]:
-    import anthropic
-    from dotenv import load_dotenv
-    load_dotenv()
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
-    client = anthropic.Anthropic()
+                locked_texts: list[TextItem] | None = None, client=None) -> tuple[EDL, str, dict]:
+    client = client or make_client()   # tests pass a fake client
     usage = {"input_tokens": 0, "output_tokens": 0}
 
     for attempt in range(MAX_RETRIES + 1):
-        resp = client.messages.create(model=MODEL, max_tokens=4000, system=SYSTEM, messages=messages,
+        resp = client.messages.create(model=MODEL, max_tokens=MAX_TOKENS_PLAN, system=SYSTEM, messages=messages,
                                       tools=[TOOL], tool_choice={"type": "auto"})
         usage["input_tokens"] += resp.usage.input_tokens
         usage["output_tokens"] += resp.usage.output_tokens
+        check_stop(resp, "edit plan")
         block = next((b for b in resp.content if b.type == "tool_use"), None)
         if block is None:
             if attempt == MAX_RETRIES:
@@ -436,13 +455,9 @@ def build_deepscan_request(info: MediaInfo, clip: Clip, frames_dir: Path) -> tup
     return [{"role": "user", "content": content}], meta
 
 
-def deep_scan_clip(media: dict[str, MediaInfo], clip: Clip, frames_dir: Path) -> tuple[Clip, dict]:
+def deep_scan_clip(media: dict[str, MediaInfo], clip: Clip, frames_dir: Path,
+                   client=None) -> tuple[Clip, dict]:
     """Re-examines ONE clip with many more frames and returns a refined, already-locked Clip."""
-    import anthropic
-    from dotenv import load_dotenv
-    load_dotenv()
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
     if clip.in_ is None or clip.out is None:
         raise ValueError("deep scan only applies to a video clip, not a photo")
     info = media.get(clip.source)
@@ -450,14 +465,15 @@ def deep_scan_clip(media: dict[str, MediaInfo], clip: Clip, frames_dir: Path) ->
         raise ValueError(f"deep scan: source file not found or not a video: {clip.source!r}")
 
     messages, meta = build_deepscan_request(info, clip, frames_dir)
-    client = anthropic.Anthropic()
+    client = client or make_client()   # tests pass a fake client
     usage = {"input_tokens": 0, "output_tokens": 0}
 
     for attempt in range(MAX_RETRIES + 1):
-        resp = client.messages.create(model=MODEL, max_tokens=1000, system=DEEPSCAN_SYSTEM, messages=messages,
-                                      tools=[DEEPSCAN_TOOL], tool_choice={"type": "auto"})
+        resp = client.messages.create(model=MODEL, max_tokens=MAX_TOKENS_DEEPSCAN, system=DEEPSCAN_SYSTEM,
+                                      messages=messages, tools=[DEEPSCAN_TOOL], tool_choice={"type": "auto"})
         usage["input_tokens"] += resp.usage.input_tokens
         usage["output_tokens"] += resp.usage.output_tokens
+        check_stop(resp, "deep-scan answer")
         block = next((b for b in resp.content if b.type == "tool_use"), None)
         if block is None:
             if attempt == MAX_RETRIES:
