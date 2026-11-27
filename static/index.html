@@ -16,6 +16,11 @@ header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:
 header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
 header h1 span{color:var(--acc)}
 header .sp{flex:1}
+/* Simple / All features: a two-way switch; neither is pressed when Settings holds your own mix */
+.modeSwitch{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.modeSwitch button{border:0;border-radius:0;background:transparent;color:var(--muted)}
+.modeSwitch button+button{border-left:1px solid var(--line)}
+.modeSwitch button[aria-pressed="true"]{background:var(--panel2);color:var(--text);font-weight:650}
 select,input,textarea,button{font:inherit;color:inherit}
 select,input[type=number],input[type=text],textarea{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
 textarea{width:100%;resize:vertical;min-height:54px}
@@ -62,6 +67,8 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .panel video{width:100%;max-height:220px;background:#000;border-radius:6px}
 .hint{color:var(--muted);font-size:12px;line-height:1.4}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* a plan error gets its own line under the timeline header (it used to run into the shortcuts text) */
+#edlMsg.edlErr{flex-basis:100%;white-space:pre-line;font-size:12.5px;line-height:1.45;margin-bottom:10px}
 .tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
 .tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:grab;min-width:6px;background-size:cover;background-position:center;position:relative;touch-action:none}
 .tl div.dragging{opacity:.5;cursor:grabbing;z-index:4;outline:2px dashed var(--acc);outline-offset:-2px}
@@ -160,7 +167,11 @@ button.ghost{background:transparent;border-color:var(--line)}
   <button id="newProj">+ New project</button>
   <div class="sp"></div>
   <span class="hint" id="usage"></span>
-  <button class="small ghost" id="settingsBtn" title="Show or hide feature groups">⚙ Settings</button>
+  <div class="modeSwitch" role="group" aria-label="How much of the app to show">
+    <button class="small" id="modeSimple" aria-pressed="false" title="The essentials: your files, the plan, edits, music, preview and export">Simple</button>
+    <button class="small" id="modeAll" aria-pressed="false" title="Every panel, including B-roll, lock rules, deep scan, sound effects and DaVinci export">All features</button>
+  </div>
+  <button class="small ghost" id="settingsBtn" title="Show or hide feature groups one by one">⚙ Settings</button>
 </header>
 
 <div id="settingsModal" class="modalBack" hidden>
@@ -391,7 +402,32 @@ const FEATURE_LABELS = {
   overlays: ['B-roll / PIP / split-screen', 'A second video layer you place by hand: picture-in-picture in a corner, or a side-by-side split-screen, over any time window of the main timeline. Manual only - the AI never adds these on its own.'],
   quickPreview: ['Quick preview', 'A "⚡ Quick preview" button for a fast, low-res, cached preview - only the clips you actually changed get re-encoded, so it\'s much faster than Render draft once you\'ve previewed once. Optional auto-preview after each edit.'],
 };
-const DEFAULT_FEATURES = Object.fromEntries(Object.keys(FEATURE_LABELS).map(k => [k, true]));
+// Simple mode is what someone opening the app for the first time gets: the essentials (files, demos,
+// the plan, per-clip edits, music, subtitles, preview and export) without the specialist panels below.
+// A usability test found the first screen showing 20+ controls at once. "All features" shows
+// everything; Settings still turns any one group on or off. Anyone who already saved their own
+// choice in Settings keeps it.
+const SIMPLE_OFF = ['example', 'davinci', 'sfx', 'deepScan', 'lockRules', 'planVariants', 'overlays'];
+const ALL_FEATURES = Object.fromEntries(Object.keys(FEATURE_LABELS).map(k => [k, true]));
+const SIMPLE_FEATURES = Object.fromEntries(Object.keys(FEATURE_LABELS).map(k => [k, !SIMPLE_OFF.includes(k)]));
+const DEFAULT_FEATURES = SIMPLE_FEATURES;
+function featureMode() {
+  const keys = Object.keys(FEATURE_LABELS);
+  if (keys.every(k => !!FEATURES[k] === SIMPLE_FEATURES[k])) return 'simple';
+  if (keys.every(k => FEATURES[k])) return 'all';
+  return 'custom';
+}
+function renderModeSwitch() {
+  const mode = featureMode();
+  $('#modeSimple').setAttribute('aria-pressed', String(mode === 'simple'));
+  $('#modeAll').setAttribute('aria-pressed', String(mode === 'all'));
+}
+function setFeatureMode(set) {
+  FEATURES = {...set};
+  saveFeatures();
+  applyFeatureVisibility();
+  if (!$('#settingsModal').hidden) renderSettingsModal();
+}
 function loadFeatures() {
   try { return {...DEFAULT_FEATURES, ...JSON.parse(localStorage.getItem('features') || '{}')} }
   catch { return {...DEFAULT_FEATURES} }
@@ -425,8 +461,11 @@ function applyFeatureVisibility() {
   // panels whose own render function already decides `hidden` from other state (audio clips
   // present, etc.) - just re-run them so the feature flag gets folded into that same check
   if (P) { renderTranscripts(); renderDemoBtns(); renderPlan(); renderHint(); renderLockRules(); renderOverlays(); }
+  renderModeSwitch();
 }
 $('#settingsBtn').onclick = () => { renderSettingsModal(); $('#settingsModal').hidden = false };
+$('#modeSimple').onclick = () => setFeatureMode(SIMPLE_FEATURES);
+$('#modeAll').onclick = () => setFeatureMode(ALL_FEATURES);
 $('#settingsClose').onclick = () => { $('#settingsModal').hidden = true };
 $('#settingsModal').onclick = e => { if (e.target.id === 'settingsModal') $('#settingsModal').hidden = true };
 // ---------------- units: every slider/number value shown in the UI gets a consistent suffix ----------------
@@ -1497,10 +1536,10 @@ const saveEdl = debounce(async () => {
   });
   try {
     await thisSave;
-    $('#edlMsg').textContent = '✓ saved'; $('#edlMsg').style.color = 'var(--ok)';
+    showEdlMsg('✓ saved', false);
     if (FEATURES.quickPreview && $('#autoPreviewChk')?.checked) triggerPreview();
   }
-  catch (e) { $('#edlMsg').textContent = e.message; $('#edlMsg').style.color = 'var(--err)' }
+  catch (e) { showEdlMsg(e.message, true) }
 }, 400);
 // ---------------- bulk clip selection ----------------
 function bulkBar() {
@@ -1612,7 +1651,60 @@ function bindClips(area) {
 // ---------------- split ----------------
 function showEdlMsg(msg, isErr) {
   const el = $('#edlMsg'); if (!el) return;
-  el.textContent = msg; el.style.color = isErr ? 'var(--err)' : 'var(--ok)';
+  el.classList.toggle('edlErr', !!isErr);
+  el.textContent = isErr ? friendlyEdlError(msg) : msg;
+  el.style.color = isErr ? 'var(--err)' : 'var(--ok)';
+  if (isErr && /transition is too long/.test(msg || '')) {
+    const b = document.createElement('button');
+    b.className = 'small'; b.textContent = 'Shorten the transition for me';
+    b.onclick = fixTooLongTransitions;
+    el.append(' ', b);
+  }
+}
+// The server's plan errors are written for the AI, which reads them to correct its own plans: they
+// count clips from 0, as in the plan's JSON ("clip 2" is the third clip). The person editing gets a
+// plain sentence with the numbers they see on screen, which count from 1. Unknown messages pass through.
+function friendlyEdlError(msg) {
+  if (!msg) return msg;
+  if (/validation error for/i.test(msg)) return "Something in the plan has a value the app can't use. Undo your last change and try again.";
+  if (!/^Invalid EDL:/.test(msg)) return msg;
+  const n = s => +s + 1;
+  const rules = [
+    [/^clip (\d+): the ([\d.]+)s transition is too long \(max ([\d.]+)s\)/, m => `The transition into clip ${n(m[1])} (${m[2]} s) is too long for clips this short: make it ${m[3]} s or less, or make clips ${m[1]} and ${n(m[1])} longer.`],
+    [/^clip (\d+): cut too short/, m => `Clip ${n(m[1])} is too short: keep at least half a second of it.`],
+    [/^clip (\d+): invalid interval ([\d.]+)-([\d.]+) \(duration ([\d.]+)s\)/, m => `Clip ${n(m[1])}: the start and end (${m[2]}–${m[3]} s) have to fit inside the video, which is ${m[4]} s long, with the start first.`],
+    [/^clip (\d+): video without 'in'\/'out'/, m => `Clip ${n(m[1])} needs a start and an end time.`],
+    [/^clip (\d+): file does not exist '(.+)'/, m => `Clip ${n(m[1])} uses "${m[2]}", which isn't in this project any more: delete the clip or upload the file again.`],
+    [/^clips (\d+) and (\d+) \((.+)\) overlap: ([\d.]+)-([\d.]+) vs ([\d.]+)-([\d.]+)/, m => `Clips ${n(m[1])} and ${n(m[2])} use the same moment of "${m[3]}" (${m[4]}–${m[5]} s and ${m[6]}–${m[7]} s): pick different moments, or delete one of them.`],
+    [/^overlay (\d+): too short/, m => `B-roll ${n(m[1])} is too short: keep at least 0.3 s of it.`],
+    [/^overlay (\d+): invalid interval ([\d.]+)-([\d.]+) \(duration ([\d.]+)s\)/, m => `B-roll ${n(m[1])}: the start and end (${m[2]}–${m[3]} s) have to fit inside its video (${m[4]} s), with the start first.`],
+    [/^overlay (\d+): video without/, m => `B-roll ${n(m[1])} needs a start and an end time.`],
+    [/^overlay (\d+): file does not exist '(.+)'/, m => `B-roll ${n(m[1])} uses "${m[2]}", which isn't in this project any more.`],
+    [/^the text '(.+)' starts after the end of the video \(([\d.]+)s\)/, m => `The text "${m[1]}" starts after the video ends (${m[2]} s): move it earlier.`],
+    [/^the texts '(.+)' and '(.+)' overlap in time at the same position \((.+)\)/, m => `The texts "${m[1]}" and "${m[2]}" are on screen at the same time in the same place (${m[3]}): move one, or change when it shows.`],
+    [/^the '(.+)' sound effect starts after the end of the video \(([\d.]+)s\)/, m => `The "${m[1]}" sound effect starts after the video ends (${m[2]} s): move it earlier.`],
+    [/^the overlay '(.+)' starts after the end of the video \(([\d.]+)s\)/, m => `The B-roll "${m[1]}" starts after the video ends (${m[2]} s): move it earlier.`],
+  ];
+  const lines = msg.replace(/^Invalid EDL:\s*/, '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    for (const [re, say] of rules) { const m = l.match(re); if (m) return say(m) }
+    return l;
+  });
+  return lines.length > 1 ? `This edit can't be used yet:\n• ${lines.join('\n• ')}` : `This edit can't be used yet: ${lines[0]}`;
+}
+// The "Shorten the transition for me" fix: the same rule as the server (a transition is at most 40%
+// of the shorter of the two clips it joins); one too short even for 0.15 s becomes a direct cut.
+function fixTooLongTransitions() {
+  const clips = P.edl.clips;
+  snapshotEdl();
+  for (let i = 1; i < clips.length; i++) {
+    const tr = clips[i].transition_in; if (!tr) continue;
+    const lim = 0.4 * Math.min(clipDur(clips[i - 1]), clipDur(clips[i]));
+    if (tr.duration > lim + 1e-6) {
+      if (lim >= 0.15) tr.duration = Math.floor(lim * 100) / 100;
+      else clips[i].transition_in = null;
+    }
+  }
+  saveEdl(); renderPlan();
 }
 // Which clip (and offset into it) sits at timeline time t, in the same "final video seconds"
 // convention already used for text start/end and the beat ticks (i.e. it does not subtract
@@ -1914,7 +2006,7 @@ async function doRender(final) {
     $('#dlHint').textContent = (final ? 'Ready to post. ' : 'The draft is for checking; use Render final for the version to post. ')
       + 'To get it on your phone: send the file to yourself (email, WhatsApp, Google Drive or iCloud) or copy it over a USB cable.';
     alertStatus('#renderStatus', `Done in ${r.seconds}s`, false, true);
-  } catch (e) { alertStatus('#renderStatus', e.message, true) }
+  } catch (e) { alertStatus('#renderStatus', friendlyEdlError(e.message), true) }
   $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = false;
 }
 $('#fcpBtn').onclick = async () => {
@@ -1944,7 +2036,7 @@ const triggerPreview = debounce(async () => {
     const r = await waitJob(job, '#previewStatus', 'Quick preview');
     $('#player').src = r.url; $('#player').play().catch(() => {});
     alertStatus('#previewStatus', `Preview ready in ${r.seconds}s`, false, true);
-  } catch (e) { alertStatus('#previewStatus', e.message, true) }
+  } catch (e) { alertStatus('#previewStatus', friendlyEdlError(e.message), true) }
   PREVIEW_INFLIGHT = false;
   if ($('#previewBtn')) $('#previewBtn').disabled = false;
 }, 900);

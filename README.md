@@ -37,6 +37,8 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 **Manual editing, once the AI draft lands**
 - Full NLE-style toolkit: undo/redo, keyboard shortcuts, drag-trim, a split tool, per-clip speed (0.25×–4×, with ½× / 1× / 2× / 4× buttons), manual pan/reframe, a waveform display, multi-select.
 - A demo, a regenerate or a picked variant asks before it replaces your hand edits, and the previous plan stays one Undo away.
+- **Simple mode** by default on a first visit: the essentials (files, demos, the plan, per-clip edits, music, preview and export), with **All features** one click away in the header and every group still switchable in Settings.
+- Plan errors in plain words, with the clip numbers you see on screen (e.g. "The transition into clip 3 (0.3 s) is too long for clips this short…"), and a one-click fix for a transition that no longer fits.
 - B-roll, picture-in-picture, and split-screen overlays.
 - J/L cuts — a clip's sound can start early or run past its picture, the way editors hide a hard cut.
 - Beat-synced zoom punches on the music.
