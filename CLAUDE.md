@@ -83,7 +83,7 @@ uvicorn app.main:app --port 8000      # -> http://localhost:8000
 python -m app.render edl_examples/test_manual.json            # draft, half resolution
 python -m app.render edl_examples/test_manual.json --final    # full 1080x1920
 python -m app.planner --preset travel_cinematic --dry-run     # see the prompt, no API call
-python -m pytest -q                                           # plan validation (tests/test_edl.py) + AI request loop with a fake client (tests/test_planner_loop.py); CI runs them on every push
+python -m pytest -q                                           # plan validation (tests/test_edl.py) + AI request loop with a fake client (tests/test_planner_loop.py) + missing-key check on the AI routes (tests/test_api_key.py); CI runs them on every push
 ```
 
 **The server runs without `--reload`.** Any change to backend code (`app/*.py`) needs a manual restart to take effect.

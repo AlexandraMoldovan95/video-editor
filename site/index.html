@@ -343,7 +343,7 @@
         </div>
         <div class="feature-block">
           <h3>Quality</h3>
-          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. 43 automated tests run on every push: 27 on the edit-plan validation and 16 on the AI request loop, with a fake AI client; rendering, audio and the UI are still tested by hand.</p>
+          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. 49 automated tests run on every push: 27 on the edit-plan validation, 16 on the AI request loop with a fake AI client, and 6 on the missing-API-key check; rendering, audio and the UI are still tested by hand.</p>
         </div>
         <div class="feature-block">
           <h3>Architecture</h3>
@@ -370,7 +370,7 @@
       <ul class="limits">
         <li><strong>The AI only sees 4 frames per clip.</strong> It picks well on calm footage but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.</li>
         <li><strong>Beat tracking is tested on synthetic tracks</strong> (128 and 95 BPM, ~22ms error). On music without a clear drum hit it can get it wrong; turn off "On beat" for that track.</li>
-        <li><strong>Rendering, audio and the UI have no automated tests.</strong> The 43 automated tests cover the plan validation (27) and the AI request loop (16); the rest is tested by hand: thorough, but it doesn't scale the way an automated suite would.</li>
+        <li><strong>Rendering, audio and the UI have no automated tests.</strong> The 49 automated tests cover the plan validation (27), the AI request loop (16) and the missing-key check (6); the rest is tested by hand: thorough, but it doesn't scale the way an automated suite would.</li>
         <li><strong>Whisper subtitles and the DaVinci export are implemented but untested on a normal install.</strong> The model download was blocked in the sandboxed environment this was built in; the logic was verified with a simulated transcript and validated against OpenTimelineIO, but neither has run for real yet.</li>
       </ul>
     </div>

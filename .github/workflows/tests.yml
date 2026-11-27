@@ -1,7 +1,9 @@
 # Runs the automated tests on every push and pull request: the edit-plan validation
-# (tests/test_edl.py) and the AI request loop with a fake client (tests/test_planner_loop.py).
-# They need pydantic and numpy (app/music.py, imported by the planner): no ffmpeg, no API key,
-# nothing secret, and no call to the real API.
+# (tests/test_edl.py), the AI request loop with a fake client (tests/test_planner_loop.py) and
+# the missing-key check on the AI routes (tests/test_api_key.py).
+# They need pydantic and numpy (app/music.py, imported by the planner), plus fastapi,
+# python-multipart, python-dotenv and httpx to load the app and call its routes in-process:
+# no ffmpeg, no API key, nothing secret, and no call to the real API.
 name: tests
 on: [push, pull_request]
 permissions:
@@ -14,5 +16,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "pydantic>=2.6" "numpy>=1.26" pytest
+      - run: pip install "pydantic>=2.6" "numpy>=1.26" "fastapi>=0.110" "python-multipart>=0.0.9" "python-dotenv>=1.0" httpx pytest
       - run: python -m pytest -q
