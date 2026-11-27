@@ -41,8 +41,9 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Plan errors in plain words, with the clip numbers you see on screen (e.g. "The transition into clip 3 (0.3 s) is too long for clips this short…"), shown in a box at the bottom of the window as well as above the timeline, with a one-click fix for a transition that no longer fits or a clip cut under half a second.
 - While your last change can't be saved, Render, Quick preview and the FCPXML export stop and say so, instead of quietly using the last plan that did save.
 - **Apply to all clips** gives every clip the chosen colour look (warm, cool, contrast…) in one click, no AI needed; Undo takes it back.
-- Removing a file asks first and names the plan's clips that use it; those clips (and any B-roll from it) leave the plan with it, and the project's file count updates at once.
-- B-roll, picture-in-picture, and split-screen overlays.
+- Removing a file asks first and names the plan's clips that use it; those clips (and any overlay from it) leave the plan with it, and the project's file count updates at once.
+- Overlays: B-roll as picture-in-picture or split screen.
+- Labels in plain words, after a usability test flagged the jargon: "Use it: AI decides / always / never", "Fit to frame", "Always lock", "Overlays", transitions named "fade through black" rather than ffmpeg's `fadeblack`.
 - J/L cuts — a clip's sound can start early or run past its picture, the way editors hide a hard cut.
 - Beat-synced zoom punches on the music.
 - Free-drag text placement.
@@ -57,7 +58,7 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Live quick-preview: only re-encodes the clips you changed, kept fully separate from the real export path so a low-quality preview can never leak into a final render.
 - Optional subtitles (Whisper), recalculated live from the current timeline so they never go out of sync with your edits.
 - Export a finished MP4, or an FCPXML timeline that reopens your *original* files in DaVinci Resolve / Final Cut.
-- Three formats per project: vertical 9:16 (Reels, TikTok, Shorts), square 1:1 (feed posts) or horizontal 16:9 (YouTube); switching re-sizes the current plan, and new plans follow it.
+- Three formats per project: vertical 9:16 (Reels, TikTok, Shorts), square 1:1 (feed posts) or horizontal 16:9 (YouTube); switching re-sizes the current plan, and new plans follow it. Clips of another shape (vertical clips in 16:9, say) are named, with one click to show them whole on a blurred background instead of only their middle. The player never gets taller than 70% of the window, in any format or window size.
 - Save the frame you paused on as a cover image (JPG, at the rendered video's size).
 - Projects have names ("Hike with Ana"), asked for when you create one and changeable with Rename. A first visit starts in "My first project"; **+ New project** on a project that's still empty just renames it, so no empty ones pile up.
 - Try 3 demo edits instantly, no API key needed. Without a key, simple mode hides what only the AI uses (its style settings, Generate plan, the per-file notes for the AI) and says why; All features shows them, and the AI button then says at once, in plain words, that it isn't set up.

@@ -119,7 +119,9 @@ body.noAi .aiOnly{display:none !important}
 .itemreason{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-style:italic;opacity:.85}
 .status{font-size:12.5px;padding:8px 10px;border-radius:7px;background:var(--panel2);margin-top:8px}
 .status.err{color:var(--err)}.status.ok{color:var(--ok)}
-.preview video{width:100%;aspect-ratio:var(--player-ar,9/16);background:#000;border-radius:8px}
+/* the player fills the column but never gets taller than 70% of the window: in one column (windows
+   under 1100 px) a vertical video was 1698 px tall in a 768 px window. --player-wh = width / height */
+.preview video{display:block;margin-inline:auto;width:min(100%,calc(70vh * var(--player-wh,0.5625)));aspect-ratio:var(--player-ar,9/16);background:#000;border-radius:8px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px}
 .kv span:nth-child(odd){color:var(--muted)}
 .energy{display:flex;align-items:flex-end;height:34px;gap:1px;margin:6px 0 2px;cursor:pointer}
@@ -182,7 +184,7 @@ button.ghost{background:transparent;border-color:var(--line)}
   <span class="hint" id="usage"></span>
   <div class="modeSwitch" role="group" aria-label="How much of the app to show">
     <button class="small" id="modeSimple" aria-pressed="false" title="The essentials: your files, the plan, edits, music, preview and export">Simple</button>
-    <button class="small" id="modeAll" aria-pressed="false" title="Every panel, including B-roll, lock rules, deep scan, sound effects and DaVinci export">All features</button>
+    <button class="small" id="modeAll" aria-pressed="false" title="Every panel, including overlays, always-lock rules, deep scan, sound effects and DaVinci export">All features</button>
   </div>
   <button class="small ghost" id="settingsBtn" title="Show or hide feature groups one by one">⚙ Settings</button>
 </header>
@@ -322,7 +324,7 @@ button.ghost{background:transparent;border-color:var(--line)}
       </div>
 
       <div class="panel" id="lockRulesPanel">
-        <h3>Lock rules <span class="hint">(optional - auto-locks matching clips on every regenerate, instead of locking them one by one)</span></h3>
+        <h3>Always lock <span class="hint">(optional: clips the AI keeps exactly as they are every time it redoes the plan, so you don't have to lock them one by one)</span></h3>
         <div id="lockRulesList" class="hint">No rules yet.</div>
         <div class="row" style="margin-top:8px;gap:6px">
           <span class="hint">Keep the opening</span>
@@ -337,7 +339,7 @@ button.ghost{background:transparent;border-color:var(--line)}
       </div>
 
       <div class="panel" id="overlaysPanel">
-        <h3>B-roll / PIP <span class="hint">(optional - a second video layer over a time window: picture-in-picture in a corner, or side-by-side split-screen. Manual only, always muted - the main audio keeps playing underneath.)</span></h3>
+        <h3>Overlays <span class="hint">(optional: a second video or photo on top of the main one, for part of the video: small in a corner (picture-in-picture) or side by side (split screen). You place it by hand; it's always silent, so the main sound keeps playing.)</span></h3>
         <div id="overlaysList" class="hint">No overlays yet.</div>
         <div class="row" style="margin-top:8px;gap:6px">
           <span class="hint">Add from</span>
@@ -362,6 +364,7 @@ button.ghost{background:transparent;border-color:var(--line)}
           <option value="16:9">Horizontal 16:9 · YouTube</option>
         </select>
       </div>
+      <div class="hint" id="fitHint" style="margin:-2px 0 8px" hidden></div>
       <video id="player" controls playsinline></video>
       <div class="row" style="margin-top:10px">
         <button class="primary" id="draftBtn">Render draft</button>
@@ -432,9 +435,9 @@ const FEATURE_LABELS = {
   davinci: ['DaVinci Resolve / FCPXML export', 'Exporting an editable timeline for DaVinci Resolve or Final Cut.'],
   sfx: ['SFX & ambience track', 'A small sound-effect library (whoosh, ding, impact…) plus a second background audio layer under the music.'],
   deepScan: ['Deep scan a clip', 'A "🔍 Deep scan" button on each video clip that re-examines it with 20 frames instead of 4 and refines the exact cut - useful for fast or action-heavy footage.'],
-  lockRules: ['Lock rules', 'Standing rules ("keep the opening 3s", "never touch clips from file X") that auto-lock matching clips on every regenerate, instead of locking them one by one.'],
+  lockRules: ['Always lock', 'Rules like "keep the opening 3 s" or "never touch clips from this file" that lock the matching clips every time the AI redoes the plan, instead of locking them one by one.'],
   planVariants: ['Multiple draft variants', 'A "🎲 3 variants" button that generates 2-3 structurally different drafts in one pass, so you can pick your favorite instead of only ever seeing one.'],
-  overlays: ['B-roll / PIP / split-screen', 'A second video layer you place by hand: picture-in-picture in a corner, or a side-by-side split-screen, over any time window of the main timeline. Manual only - the AI never adds these on its own.'],
+  overlays: ['Overlays (picture-in-picture, split screen)', 'A second video or photo you place by hand on top of the main one, for any part of the video: small in a corner, or side by side. The AI never adds these on its own.'],
   quickPreview: ['Quick preview', 'A "⚡ Quick preview" button for a fast, low-res, cached preview - only the clips you actually changed get re-encoded, so it\'s much faster than Render draft once you\'ve previewed once. Optional auto-preview after each edit.'],
 };
 // Simple mode is what someone opening the app for the first time gets: the essentials (files, demos,
@@ -588,6 +591,11 @@ function redo() {
 }
 const PRESET_FIELDS = ['target_duration', 'pace', 'color_look', 'vertical_fit', 'photo_motion', 'transition_style', 'text_style'];
 const TR_TYPES = ['fade', 'dissolve', 'fadeblack', 'fadewhite', 'wipeleft', 'slideleft', 'slideup', 'smoothleft', 'circleopen', 'circleclose'];
+// ffmpeg's names ("fadeblack", "slideleft") stay in the plan; the page shows words
+const TR_LABELS = {fade: 'fade', dissolve: 'dissolve', fadeblack: 'fade through black', fadewhite: 'fade through white',
+  wipeleft: 'wipe to the left', slideleft: 'slide to the left', slideup: 'slide up', smoothleft: 'smooth slide to the left',
+  circleopen: 'opening circle', circleclose: 'closing circle'};
+const trLabel = t => TR_LABELS[t] || t;
 const COLOR_KEYS = [['brightness', 'Brightness', -0.3, 0.3, 0.01], ['contrast', 'Contrast', 0.5, 2, 0.01],
                     ['saturation', 'Saturation', 0, 3, 0.01], ['warmth', 'Warmth', -0.2, 0.2, 0.01]];
 const thumb = n => `/api/projects/${P.id}/thumb/${encodeURIComponent(n)}`;
@@ -676,7 +684,7 @@ async function upload(files) {
   catch (e) { alertStatus('#planStatus', e.message, true) }
   drop.innerHTML = 'Drag videos and photos here<br><small>or click to choose</small>';
   // renderLockRules / renderOverlays also fill their file pickers ("Never touch clips from",
-  // B-roll "Add from"); without them those stayed on "(no files yet)" until a page reload.
+  // Overlays "Add from"); without them those stayed on "(no files yet)" until a page reload.
   await refresh(); renderGrid(); renderTranscripts(); renderDemoBtns(); renderLockRules(); renderOverlays(); fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
 }
 $('#exBtn').onclick = () => $('#exIn').click();
@@ -696,8 +704,8 @@ function renderGrid() {
   $('#grid').innerHTML = P.media.map(m => {
     const h = P.hints[m.name] || {};
     const badges = [];
-    if (h.use === 'must') badges.push('<span class="b must">required</span>');
-    if (h.use === 'exclude') badges.push('<span class="b ex">excluded</span>');
+    if (h.use === 'must') badges.push('<span class="b must">always used</span>');
+    if (h.use === 'exclude') badges.push('<span class="b ex">left out</span>');
     if (P.transcripts[m.name]) badges.push('<span class="b">📝</span>');
     if (h.color || (h.fit && h.fit !== 'auto') || h.segment_in != null || h.segment_out != null || h.photo_duration || (h.photo_motion && h.photo_motion !== 'auto') || h.note)
       badges.push('<span class="b set">set</span>');
@@ -728,22 +736,22 @@ function renderHint() {
   panel.hidden = false;
   panel.innerHTML = `
     <h3>File settings <span class="hint">— ${esc(m.name)}</span></h3>
-    <div class="hint aiOnly" style="margin-bottom:6px">What you fix here is applied exactly; the AI takes it into account and harmonizes the rest.</div>
+    <div class="hint aiOnly" style="margin-bottom:6px">The AI follows what you set here exactly, and plans the rest of the video around it.</div>
     <div class="hint noAiOnly" style="margin-bottom:6px">This file's settings guide the AI planner, which isn't set up on this computer, so only the preview and Remove are shown.</div>
     ${m.kind === 'video' ? `<video id="hv" src="${src}" controls muted preload="metadata"></video>` : `<img src="${thumb(m.name)}" style="width:100%;border-radius:6px">`}
     <div class="aiOnly">
-    <div class="field"><label>Usage</label>${segBtns('use', [['auto', 'auto'], ['must', 'required'], ['exclude', 'excluded']])}</div>
+    <div class="field"><label>Use it</label>${segBtns('use', [['auto', 'AI decides'], ['must', 'always'], ['exclude', 'never']])}</div>
     ${m.kind === 'video' ? `
-      <div class="field"><label>Allowed range (s)</label>
+      <div class="field"><label>Only this part (s)</label>
         <input type="number" id="h_in" step="0.1" min="0" max="${m.duration}" value="${h.segment_in ?? ''}" placeholder="0">
         <span class="hint">–</span>
         <input type="number" id="h_out" step="0.1" min="0" max="${m.duration}" value="${h.segment_out ?? ''}" placeholder="${fmt(m.duration)}">
         <span class="hint">s</span>
       </div>
-      <div class="row" style="margin:-2px 0 6px 100px"><button class="small" id="setIn">start = now</button><button class="small" id="setOut">end = now</button><button class="small" id="clrSeg">clear</button></div>` : `
+      <div class="row" style="margin:-2px 0 6px 100px"><button class="small" id="setIn" title="The moment the video above is paused on">start here</button><button class="small" id="setOut" title="The moment the video above is paused on">end here</button><button class="small" id="clrSeg">clear</button></div>` : `
       <div class="field"><label>Duration (s)</label><input type="number" id="h_pd" step="0.1" min="2" max="4" value="${h.photo_duration ?? ''}" placeholder="auto"></div>
-      <div class="field"><label>Motion</label>${segBtns('photo_motion', [['auto', 'auto'], ['zoom_in', 'zoom in'], ['zoom_out', 'zoom out'], ['static', 'static']])}</div>`}
-    <div class="field"><label>Framing</label>${segBtns('fit', [['auto', 'auto'], ['crop_center', 'crop'], ['blur_pad', 'blurred']])}</div>
+      <div class="field"><label>Motion</label>${segBtns('photo_motion', [['auto', 'AI decides'], ['zoom_in', 'zoom in'], ['zoom_out', 'zoom out'], ['static', 'still']])}</div>`}
+    <div class="field"><label title="When the file's shape differs from the video's">Fit to frame</label>${segBtns('fit', [['auto', 'AI decides'], ['crop_center', 'crop to fill'], ['blur_pad', 'blurred background']])}</div>
     ${FEATURES.advancedClip ? `<div class="row advToggleRow"><button class="small ghost" data-advtoggle>Show advanced</button></div>
     <div class="adv">
       ${m.has_audio ? `<div class="field"><label title="${FIELD_DESC.volume}">Fix volume (%)</label><input type="checkbox" id="h_vl" ${h.volume != null ? 'checked' : ''}>
@@ -805,7 +813,7 @@ async function removeFile(name) {
   const parts = [];
   if (used.length) parts.push(used.length === P.edl.clips.length ? 'every clip in your plan uses it, so the plan goes too'
     : `it's in your plan as clip${used.length > 1 ? 's' : ''} ${list(used)}; ${used.length > 1 ? 'those clips go' : 'that clip goes'} too`);
-  if (broll) parts.push(`it's used as B-roll ${broll > 1 ? `${broll} times` : 'once'}; that goes too`);
+  if (broll) parts.push(`it's used as an overlay ${broll > 1 ? `${broll} times` : 'once'}; ${broll > 1 ? 'those go' : 'that goes'} too`);
   const msg = `Remove "${name}" from this project?\n\n${parts.length ? parts.join('. ') + '.\n\n' : ''}`
     + `Your original file on your computer isn't touched.${parts.length ? " This can't be undone." : ''}`;
   if (!confirm(msg)) return;
@@ -989,11 +997,12 @@ $('#lrAddSource').onclick = () => {
   saveLockRules([...(P.lock_rules || []), {type: 'source', source}]);
 };
 
-// ---------------- overlays (B-roll / PIP / split-screen - a second, manual-only video layer) ----------------
+// ---------------- overlays (picture-in-picture / split screen - a second, manual-only video layer;
+// shown as "Overlays" since a usability test found "B-roll / PIP" was jargon) ----------------
 // Part of the EDL itself (edl.py's OverlayItem), not a separate endpoint like lock rules - saved
 // through the same debounced saveEdl() as clips/texts/sfx.
-const OVERLAY_MODES = [['pip_tl', '↖ PIP top-left'], ['pip_tr', '↗ PIP top-right'], ['pip_bl', '↙ PIP bottom-left'],
-                       ['pip_br', '↘ PIP bottom-right'], ['split_left', '◧ Split left'], ['split_right', '◨ Split right']];
+const OVERLAY_MODES = [['pip_tl', '↖ small, top left'], ['pip_tr', '↗ small, top right'], ['pip_bl', '↙ small, bottom left'],
+                       ['pip_br', '↘ small, bottom right'], ['split_left', '◧ side by side, left half'], ['split_right', '◨ side by side, right half']];
 const totalMainDuration = () => (P.edl?.clips || []).reduce((s, c) => s + clipDur(c), 0);
 const overlayDur = o => o.in != null ? (o.out - o.in) : (o.duration ?? 2.5);
 function renderOverlays() {
@@ -1388,9 +1397,10 @@ function renderPlan() {
   const area = $('#planArea');
   updatePlanBtn();
   // overlays live in the plan too: a demo, a regenerate, a picked variant or an undo replaces
-  // them, and the B-roll panel used to keep showing the old ones (and an empty file picker)
+  // them, and the Overlays panel used to keep showing the old ones (and an empty file picker)
   renderOverlays();
   $('#applyLookBtn').disabled = !P.edl;
+  renderFitHint();   // which clips are cropped changes with the plan
   if (!planSaveFailed()) $('#edlToast').hidden = true;   // the plan on screen changed since the refused save
   $('#usage').textContent = P.usage ? `last plan: ${P.usage.input_tokens} tok in / ${P.usage.output_tokens} out` : '';
   if (!P.edl) {
@@ -1605,7 +1615,7 @@ function clipRow(c, i) {
   const timing = c.in != null
     ? `<div class="field"><label>Start / end (s)</label><input type="number" data-f="in" step="0.1" min="0" max="${m.duration}" value="${c.in}"><input type="number" data-f="out" step="0.1" min="0" max="${m.duration}" value="${c.out}"><span class="hint">/ ${fmt(m.duration || 0)}s</span></div>`
     : `<div class="field"><label>Duration (s)</label><input type="number" data-f="duration" step="0.1" min="2" max="4" value="${c.duration}"></div>
-       <div class="field"><label>Motion</label><select data-f="motion">${['zoom_in', 'zoom_out', 'static'].map(v => `<option ${c.motion === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
+       <div class="field"><label>Motion</label><select data-f="motion">${[['zoom_in', 'zoom in'], ['zoom_out', 'zoom out'], ['static', 'still']].map(([v, l]) => `<option value="${v}" ${c.motion === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
   return `<div class="clip ${open ? 'sel' : ''} ${MULTI_SEL.has(i) ? 'multisel' : ''} ${c.locked ? 'locked' : ''}" data-i="${i}">
     <div class="ix">${i + 1}</div>
     <img src="${thumb(c.source)}" alt="">
@@ -1613,7 +1623,7 @@ function clipRow(c, i) {
       <div class="hint">${c.in != null ? `${fmt(c.in)}–${fmt(c.out)}s` : 'photo'} · ${fmt(clipDur(c))}s · ${c.fit === 'blur_pad' ? 'blurred' : 'crop'}${(c.speed && c.speed !== 1) ? ` · ${fmt(c.speed)}× ${c.speed > 1 ? 'timelapse' : 'slow-mo'}` : ''}</div>
       <div class="hint" title="Change it with Edit, then Show advanced">${colourSummary(c)}</div>
       ${m.has_audio ? `<div class="hint" title="${FIELD_DESC.volume}">🔊 sound ${(c.volume ?? 1) > 0 ? fmtUnit('volume', c.volume ?? 1) : 'off'}${c.audio_lead ? ` · 🔊⇤ J-cut ${fmt(c.audio_lead)}s` : ''}${c.audio_lag ? ` · 🔊⇥ L-cut ${fmt(c.audio_lag)}s` : ''}</div>` : ''}
-      ${i > 0 ? `<div class="trb">${c.transition_in ? `↘ enters with ${c.transition_in.type} ${fmt(c.transition_in.duration)}s` : '| direct cut'}</div>` : ''}
+      ${i > 0 && c.transition_in ? `<div class="trb">↘ transition in: ${trLabel(c.transition_in.type)}, ${fmt(c.transition_in.duration)} s</div>` : ''}
       ${c.low_confidence ? `<div class="hint" style="color:var(--warn)">⚠ the AI wasn't fully sure about this cut (fast/action-heavy moment) — worth a manual check</div>` : ''}
       ${c.reason ? `<div class="hint itemreason" title="${esc(c.reason)}">💡 ${esc(c.reason)}</div>` : ''}</div>
     <div class="ctrl">
@@ -1624,9 +1634,9 @@ function clipRow(c, i) {
       <button class="small" data-a="del" title="Delete">✕</button>
     </div>
     ${open ? `<div class="det">${timing}
-      ${i > 0 ? `<div class="field"><label>Transition</label><select data-f="tr_type"><option value="">direct cut</option>${TR_TYPES.map(t => `<option ${c.transition_in?.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      ${i > 0 ? `<div class="field"><label>Transition in</label><select data-f="tr_type"><option value="">none (straight cut)</option>${TR_TYPES.map(t => `<option value="${t}" ${c.transition_in?.type === t ? 'selected' : ''}>${trLabel(t)}</option>`).join('')}</select>
         <input type="number" data-f="tr_dur" step="0.05" min="0.15" max="1" value="${c.transition_in?.duration ?? 0.4}" ${c.transition_in ? '' : 'disabled'}><span class="hint">s</span></div>` : ''}
-      <div class="field"><label>Framing</label><select data-f="fit"><option value="crop_center" ${c.fit === 'crop_center' ? 'selected' : ''}>center crop</option><option value="blur_pad" ${c.fit === 'blur_pad' ? 'selected' : ''}>blurred background</option></select></div>
+      <div class="field"><label title="When the file's shape differs from the video's">Fit to frame</label><select data-f="fit"><option value="crop_center" ${c.fit === 'crop_center' ? 'selected' : ''}>crop to fill</option><option value="blur_pad" ${c.fit === 'blur_pad' ? 'selected' : ''}>blurred background</option></select></div>
       ${FEATURES.advancedClip ? `${c.fit === 'crop_center' ? `<div class="field"><label title="Slides the crop within whatever the frame doesn't show - only has room on whichever axis the crop is actually cutting into.">Reframe (% from center)</label><div class="panpad"><i class="dot" style="left:${((c.pan_x ?? 0) * 50 + 50)}%;top:${((c.pan_y ?? 0) * 50 + 50)}%"></i></div><span class="hint" id="panVal">x ${Math.round((c.pan_x ?? 0) * 100)}% · y ${Math.round((c.pan_y ?? 0) * 100)}% — drag to re-center the crop</span></div>` : ''}
       ${c.in != null ? `<div class="field"><label title="${FIELD_DESC.speed}">Speed</label><input type="range" data-f="speed" min="0.25" max="4" step="0.05" value="${c.speed ?? 1}"><span class="v">${fmtUnit('speed', c.speed ?? 1)}</span>
         <span class="row" style="gap:3px">${[0.5, 1, 2, 4].map(v => `<button type="button" class="small ghost" data-speedset="${v}" title="${v === 1 ? 'Normal speed' : v < 1 ? 'Slow motion' : 'Faster (timelapse)'}" ${Math.abs((c.speed ?? 1) - v) < 0.001 ? 'disabled' : ''}>${v === 0.5 ? '½' : v}×</button>`).join('')}</span></div>` : ''}
@@ -1832,14 +1842,14 @@ function friendlyEdlError(msg) {
     [/^clip (\d+): video without 'in'\/'out'/, m => `Clip ${n(m[1])} needs a start and an end time.`],
     [/^clip (\d+): file does not exist '(.+)'/, m => `Clip ${n(m[1])} uses "${m[2]}", which isn't in this project any more: delete the clip or upload the file again.`],
     [/^clips (\d+) and (\d+) \((.+)\) overlap: ([\d.]+)-([\d.]+) vs ([\d.]+)-([\d.]+)/, m => `Clips ${n(m[1])} and ${n(m[2])} use the same moment of "${m[3]}" (${m[4]}–${m[5]} s and ${m[6]}–${m[7]} s): pick different moments, or delete one of them.`],
-    [/^overlay (\d+): too short/, m => `B-roll ${n(m[1])} is too short: keep at least 0.3 s of it.`],
-    [/^overlay (\d+): invalid interval ([\d.]+)-([\d.]+) \(duration ([\d.]+)s\)/, m => `B-roll ${n(m[1])}: the start and end (${m[2]}–${m[3]} s) have to fit inside its video (${m[4]} s), with the start first.`],
-    [/^overlay (\d+): video without/, m => `B-roll ${n(m[1])} needs a start and an end time.`],
-    [/^overlay (\d+): file does not exist '(.+)'/, m => `B-roll ${n(m[1])} uses "${m[2]}", which isn't in this project any more.`],
+    [/^overlay (\d+): too short/, m => `Overlay ${n(m[1])} is too short: keep at least 0.3 s of it.`],
+    [/^overlay (\d+): invalid interval ([\d.]+)-([\d.]+) \(duration ([\d.]+)s\)/, m => `Overlay ${n(m[1])}: the start and end (${m[2]}–${m[3]} s) have to fit inside its video (${m[4]} s), with the start first.`],
+    [/^overlay (\d+): video without/, m => `Overlay ${n(m[1])} needs a start and an end time.`],
+    [/^overlay (\d+): file does not exist '(.+)'/, m => `Overlay ${n(m[1])} uses "${m[2]}", which isn't in this project any more.`],
     [/^the text '(.+)' starts after the end of the video \(([\d.]+)s\)/, m => `The text "${m[1]}" starts after the video ends (${m[2]} s): move it earlier.`],
     [/^the texts '(.+)' and '(.+)' overlap in time at the same position \((.+)\)/, m => `The texts "${m[1]}" and "${m[2]}" are on screen at the same time in the same place (${m[3]}): move one, or change when it shows.`],
     [/^the '(.+)' sound effect starts after the end of the video \(([\d.]+)s\)/, m => `The "${m[1]}" sound effect starts after the video ends (${m[2]} s): move it earlier.`],
-    [/^the overlay '(.+)' starts after the end of the video \(([\d.]+)s\)/, m => `The B-roll "${m[1]}" starts after the video ends (${m[2]} s): move it earlier.`],
+    [/^the overlay '(.+)' starts after the end of the video \(([\d.]+)s\)/, m => `The overlay "${m[1]}" starts after the video ends (${m[2]} s): move it earlier.`],
   ];
   const lines = msg.replace(/^Invalid EDL:\s*/, '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
     for (const [re, say] of rules) { const m = l.match(re); if (m) return say(m) }
@@ -2163,8 +2173,38 @@ function renderFormat() {
   const [w, h] = FORMAT_SIZES[f];
   $('#formatSel').value = f;
   $('#player').style.setProperty('--player-ar', `${w}/${h}`);
+  $('#player').style.setProperty('--player-wh', String(w / h));
   $('#sizesHint').innerHTML = `<b>Quick preview</b>: a fast, small look at your edit (~${w / 4}×${h / 4}). `
     + `<b>Draft</b>: to check the finished video (${w / 2}×${h / 2}). <b>Final</b>: full quality for posting (${w}×${h}).`;
+  renderFitHint();
+}
+// A clip of another shape (a vertical clip in 16:9, say) is cropped to fill the frame, so only a band
+// across its middle shows. A usability test found nothing said "blurred background" exists for this:
+// the hint names those clips and shows them whole, on a blurred copy of themselves, in one click.
+function croppedClips() {
+  if (!P || !P.edl) return [];
+  const [w, h] = FORMAT_SIZES[P.format] || FORMAT_SIZES['9:16'];
+  const out = w / h;
+  return P.edl.clips.map((c, i) => {
+    const m = mediaOf(c.source);
+    if (!m || !m.width || !m.height || c.fit === 'blur_pad') return -1;
+    const r = m.width / m.height;
+    return Math.max(r, out) / Math.min(r, out) >= 1.5 ? i : -1;   // e.g. 9:16 in 16:9 is 3.2, 9:16 in 1:1 is 1.8
+  }).filter(i => i >= 0);
+}
+function renderFitHint() {
+  const el = $('#fitHint'); if (!el) return;
+  const idx = croppedClips();
+  el.hidden = !idx.length;
+  if (!idx.length) return;
+  const nums = idx.map(i => i + 1), list = nums.length > 6 ? `${nums.slice(0, 6).join(', ')}…` : nums.join(', ');
+  el.innerHTML = `${idx.length === 1 ? `Clip ${list} is` : `${idx.length} clips (${list}) are`} a different shape from this format, `
+    + `so only ${idx.length === 1 ? 'its' : 'their'} middle shows. <button type="button" class="small" id="fitWholeBtn">Show ${idx.length === 1 ? 'it' : 'them'} whole, on a blurred background</button>`;
+  $('#fitWholeBtn').onclick = () => {
+    snapshotEdl();
+    for (const i of croppedClips()) Object.assign(P.edl.clips[i], {fit: 'blur_pad', pan_x: 0, pan_y: 0});   // reframing only applies to a crop
+    saveEdl(); renderPlan();
+  };
 }
 $('#formatSel').onchange = async e => {
   const format = e.target.value;

@@ -452,9 +452,10 @@ const PRESETS = {
   },
 };
 
-const TR_NAMES = {slideleft:"slide left", circleclose:"circle close", wipeleft:"wipe left",
-  smoothleft:"smooth left", circleopen:"circle open", slideup:"slide up", fadewhite:"fade white",
-  fade:"fade", dissolve:"dissolve", fadeblack:"fade to black"};
+// the same words the app shows (TR_LABELS in static/index.html)
+const TR_NAMES = {slideleft:"slide to the left", circleclose:"closing circle", wipeleft:"wipe to the left",
+  smoothleft:"smooth slide to the left", circleopen:"opening circle", slideup:"slide up", fadewhite:"fade through white",
+  fade:"fade", dissolve:"dissolve", fadeblack:"fade through black"};
 
 function fmtNum(n){
   const s = n.toFixed(2).replace(/0+$/,"").replace(/\.$/,"");
@@ -504,7 +505,8 @@ function renderPlan(key){
     const dur = c.duration != null ? c.duration : (c.out - c.in);
     const range = c.duration != null ? `photo · ${fmtNum(dur)}s` : `${fmtNum(c.in)}–${fmtNum(c.out)}s · ${fmtNum(dur)}s`;
     const fit = c.fit === "blur_pad" ? "blurred" : "crop";
-    const trLabel = i === 0 ? "" : `<div class="ct">| ${c.tr ? TR_NAMES[c.tr] || c.tr : "direct cut"}</div>`;
+    // only a real transition gets a line, as in the app (a "| direct cut" line under every other clip read as a stray mark)
+    const trLabel = i > 0 && c.tr ? `<div class="ct">↘ transition in: ${TR_NAMES[c.tr] || c.tr}</div>` : "";
     return `
       <div class="clip-row">
         <div class="cn">${i + 1}</div>
