@@ -136,6 +136,9 @@ button.ghost{background:transparent;border-color:var(--line)}
 .modalBack{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
 .modalBack[hidden]{display:none}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;width:min(460px,90vw);max-height:80vh;overflow:auto}
+/* dialog titles are h2 (they were h3 straight under the page's h1, skipping a level for screen
+   readers); this keeps the size they had as h3 */
+.modal .modalTitle{margin:0;font-size:1.17em;font-weight:bold}
 .variantCard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px}
 .variantCard.err{border-color:var(--err)}
 .featRow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
@@ -162,7 +165,7 @@ button.ghost{background:transparent;border-color:var(--line)}
 
 <div id="settingsModal" class="modalBack" hidden>
   <div class="modal">
-    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Settings</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="settingsClose">✕</button></div>
+    <div class="row" style="margin-bottom:4px"><h2 class="modalTitle">Settings</h2><div class="sp" style="flex:1"></div><button class="small ghost" id="settingsClose">✕</button></div>
     <div class="hint" style="margin-bottom:10px">Turn off whatever you don't use — the app gets out of the way instead of showing everything at once. Nothing you've already set up is deleted, it's just hidden.</div>
     <div id="settingsList"></div>
   </div>
@@ -170,7 +173,7 @@ button.ghost{background:transparent;border-color:var(--line)}
 
 <div id="savePresetModal" class="modalBack" hidden>
   <div class="modal" style="width:min(360px,90vw)">
-    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Save as preset</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="savePresetClose">✕</button></div>
+    <div class="row" style="margin-bottom:4px"><h2 class="modalTitle">Save as preset</h2><div class="sp" style="flex:1"></div><button class="small ghost" id="savePresetClose">✕</button></div>
     <div class="hint" style="margin-bottom:10px">Saves the preset you have selected plus any field you've changed, as one new preset you can pick again later - for this app, on this computer.</div>
     <input type="text" id="savePresetName" placeholder="Name (e.g. My reel style)" maxlength="60" style="width:100%">
     <div class="row" style="margin-top:10px;justify-content:flex-end">
@@ -182,7 +185,7 @@ button.ghost{background:transparent;border-color:var(--line)}
 
 <div id="swapModal" class="modalBack" hidden>
   <div class="modal" style="width:min(560px,92vw)">
-    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Swap source</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="swapClose">✕</button></div>
+    <div class="row" style="margin-bottom:4px"><h2 class="modalTitle">Swap source</h2><div class="sp" style="flex:1"></div><button class="small ghost" id="swapClose">✕</button></div>
     <div class="hint" style="margin-bottom:10px">Pick a replacement file. This clip's position, color, lock and any text synced to it stay put - only the footage and its in/out (or photo duration) change.</div>
     <div class="grid" id="swapGrid" style="grid-template-columns:1fr 1fr 1fr"></div>
   </div>
@@ -190,7 +193,7 @@ button.ghost{background:transparent;border-color:var(--line)}
 
 <div id="variantsModal" class="modalBack" hidden>
   <div class="modal" style="width:min(760px,94vw)">
-    <div class="row" style="margin-bottom:4px"><h3 style="margin:0">Pick a draft</h3><div class="sp" style="flex:1"></div><button class="small ghost" id="variantsClose">✕</button></div>
+    <div class="row" style="margin-bottom:4px"><h2 class="modalTitle">Pick a draft</h2><div class="sp" style="flex:1"></div><button class="small ghost" id="variantsClose">✕</button></div>
     <div class="hint" style="margin-bottom:10px">2-3 structurally different takes on the same material. Pick one to use as your plan - you can still edit and regenerate from there.</div>
     <div id="variantsList"></div>
   </div>
