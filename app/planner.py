@@ -142,7 +142,15 @@ TOOL = {
     },
 }
 
-SYSTEM = """You are a video editor for social media (vertical format 9:16, 1080x1920, 30fps).
+# The project's output format, as the request states it to the AI: (label, size, the clip shape
+# that fills it with a plain centre crop). The server sets the plan's output size to match anyway.
+OUTPUT_FORMATS = {
+    "9:16": ("vertical 9:16", "1080x1920", "vertical"),
+    "1:1": ("square 1:1", "1080x1080", "square"),
+    "16:9": ("horizontal 16:9", "1920x1080", "horizontal"),
+}
+
+SYSTEM = """You are a video editor for social media (30fps; the output format - vertical 9:16, square 1:1 or horizontal 16:9 - is given in the request).
 You receive the raw material (metadata + frames extracted at timestamps), a preset, the user's settings and rules.
 You build an edit plan and send it ONLY through the submit_edl tool, with no other text.
 
@@ -153,7 +161,7 @@ Strict rules:
 - Photos: use "duration" (2-4s), not "in"/"out".
 - Total duration as close as possible to the target duration (+/-10%). If the material falls short, don't invent more.
 - The same clip can be used more than once only with intervals that do NOT overlap.
-- Horizontal clips get the fit from the preset; vertical ones get "crop_center".
+- Clips whose shape differs from the output format get the fit from the preset; clips of the same shape get "crop_center".
 - Color: start from the look's base values and adjust per clip only as much as needed for everything to look consistent.
   If an example video is attached below, ITS color grade is the real target: match its warmth, contrast and
   saturation mood as closely as the brightness/contrast/saturation/warmth ranges allow, even where that means
@@ -197,7 +205,8 @@ def build_request(media: dict[str, MediaInfo], preset_name: str, overrides: dict
                   locked: list[tuple[int, Clip]] | None = None,
                   music: dict | None = None,
                   locked_texts: list[TextItem] | None = None,
-                  transcripts: dict | None = None) -> tuple[list[dict], dict]:
+                  transcripts: dict | None = None,
+                  output_format: str = "9:16") -> tuple[list[dict], dict]:
     file_hints = file_hints or {}
     locked = locked or []
     usable = {n: m for n, m in media.items() if file_hints.get(n, FileHint()).use != "exclude"}
@@ -223,15 +232,17 @@ def build_request(media: dict[str, MediaInfo], preset_name: str, overrides: dict
             content.append({"type": "text", "text": label})
             content.append(_img_block(f.path))
 
+    fmt_label, fmt_size, fmt_shape = OUTPUT_FORMATS.get(output_format, OUTPUT_FORMATS["9:16"])
     spec = [
         "## Preset",
+        f"- output format: {fmt_label} ({fmt_size}); {fmt_shape} clips get \"crop_center\", the others the fit below",
         f"- target duration: {target:.1f}s" + (f" (out of {preset.target_duration}s, {locked_total:.1f}s is already locked by the user)" if locked else ""),
         f"- cut length: between {cut_range[0]}s and {cut_range[1]}s"
         + (f" (measured from the example video: median {rhythm.median}s)" if rhythm and "pace" not in overrides else ""),
         f"- color look: {preset.color_look} -> base values {json.dumps(COLOR_BASE[preset.color_look])}"
         + (" (but see the example video below: match ITS color grade over these base numbers if they differ)"
            if example and "color_look" not in overrides else ""),
-        f"- fit for horizontal clips: {preset.vertical_fit}",
+        f"- fit for clips whose shape differs from the output: {preset.vertical_fit}",
         f"- photo motion: {preset.photo_motion}",
         f"- transitions: {TRANSITION_RULES[preset.transition_style]}",
         f"- on-screen text: {TEXT_RULES[preset.text_style]}"
@@ -347,17 +358,18 @@ def call_claude(messages: list[dict], media: dict, file_hints: dict[str, FileHin
 def plan(media: dict[str, MediaInfo], preset_name: str = "neutral", overrides: dict | None = None,
          example: Path | None = None, file_hints: dict[str, FileHint] | None = None,
          current: EDL | None = None, music: dict | None = None,
-         transcripts: dict | None = None) -> dict:
+         transcripts: dict | None = None, output_format: str = "9:16") -> dict:
     """The entry point used by the server and the CLI.
 
     music = {"info": MusicInfo, "start": float, "beat_sync": bool} or None
+    output_format = "9:16" | "1:1" | "16:9" (the project's format, stated to the AI)
     """
     file_hints = file_hints or {}
     locked = [(i, c) for i, c in enumerate(current.clips) if c.locked] if current else []
     locked_texts = [t for t in current.texts if t.locked] if current else []
     with tempfile.TemporaryDirectory(prefix="vedit_frames_") as tmp:
         messages, meta = build_request(media, preset_name, overrides or {}, example, Path(tmp),
-                                       file_hints, locked, music, locked_texts, transcripts)
+                                       file_hints, locked, music, locked_texts, transcripts, output_format)
         edl, reasoning, usage = call_claude(messages, media, file_hints, locked, music_grid(music),
                                             locked_texts)
     return {"edl": edl, "reasoning": reasoning, "usage": usage, "meta": meta}
@@ -380,7 +392,7 @@ VARIANT_ANGLES = [
 def plan_variants(media: dict[str, MediaInfo], preset_name: str = "neutral", overrides: dict | None = None,
                   example: Path | None = None, file_hints: dict[str, FileHint] | None = None,
                   current: EDL | None = None, music: dict | None = None,
-                  transcripts: dict | None = None, n: int = 3) -> list[dict]:
+                  transcripts: dict | None = None, n: int = 3, output_format: str = "9:16") -> list[dict]:
     """Returns up to n variants: [{"label", "edl", "reasoning", "usage"} | {"label", "error"}, ...].
     Raises only if EVERY variant failed."""
     import concurrent.futures
@@ -400,7 +412,7 @@ def plan_variants(media: dict[str, MediaInfo], preset_name: str = "neutral", ove
 
     with tempfile.TemporaryDirectory(prefix="vedit_frames_") as tmp:
         messages, _meta = build_request(media, preset_name, overrides or {}, example, Path(tmp),
-                                        file_hints, locked, music, locked_texts, transcripts)
+                                        file_hints, locked, music, locked_texts, transcripts, output_format)
         base_content = messages[0]["content"]
         with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
             futs = [ex.submit(run_one, chr(65 + i), VARIANT_ANGLES[i], base_content) for i in range(n)]

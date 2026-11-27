@@ -234,7 +234,7 @@ def apply_demo_preset(pid: str, key: str):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(422, str(e))
     st = load_state(d)
-    st["edl"] = edl.model_dump(by_alias=True, exclude_none=True)
+    st["edl"] = with_format(edl.model_dump(by_alias=True, exclude_none=True), project_format(st))
     st["reasoning"] = preset.get("reasoning", "")
     st["usage"] = None
     st["is_demo"] = key
@@ -260,8 +260,68 @@ def list_projects():
     out = []
     for d in sorted(PROJECTS.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
         if d.is_dir() and (d / "state.json").exists():
-            out.append({"id": d.name, "files": len(list((d / "input").iterdir()))})
+            out.append({"id": d.name, "name": load_state(d).get("name", ""),
+                        "files": len(list((d / "input").iterdir()))})
     return out
+
+
+# ---------- output format: vertical, square or horizontal ----------
+# The project remembers its format; every new plan (AI, variant, demo) is set to it, and changing it
+# re-sizes the current plan. Rendering, previews and the FCPXML export already read edl.output.
+FORMATS = {"9:16": (1080, 1920), "1:1": (1080, 1080), "16:9": (1920, 1080)}
+
+
+def project_format(st: dict) -> str:
+    f = st.get("format", "9:16")
+    return f if f in FORMATS else "9:16"
+
+
+def with_format(edl: dict, fmt: str) -> dict:
+    """The plan with its output set to the format's size (fps and everything else kept)."""
+    w, h = FORMATS[fmt]
+    return {**edl, "output": {**(edl.get("output") or {}), "width": w, "height": h}}
+
+
+class FormatIn(BaseModel):
+    format: str
+
+
+@app.put("/api/projects/{pid}/format")
+def set_project_format(pid: str, body: FormatIn):
+    if body.format not in FORMATS:
+        raise HTTPException(422, f"unknown format {body.format!r} (use one of {', '.join(FORMATS)})")
+    d = pdir(pid)
+    if pid in PLANNING:
+        raise HTTPException(409, "the AI is generating the plan - try again once it finishes")
+    st = load_state(d)
+    st["format"] = body.format
+    if st["edl"]:
+        st["edl"] = with_format(st["edl"], body.format)
+    save_state(d, st)
+    return {"format": body.format, "edl": st["edl"]}
+
+
+PROJECT_NAME_MAX = 60
+
+
+def clean_project_name(raw: str) -> str:
+    """A project's display name ("Hike with Ana"): control characters (tabs, line breaks...) become
+    spaces, runs of spaces collapse, at most 60 characters. Empty means "unnamed" (shown as its id)."""
+    s = "".join(ch if ch.isprintable() else " " for ch in str(raw or ""))
+    return " ".join(s.split())[:PROJECT_NAME_MAX].strip()
+
+
+class ProjectNameIn(BaseModel):
+    name: str = Field("", max_length=200)
+
+
+@app.put("/api/projects/{pid}/name")
+def rename_project(pid: str, body: ProjectNameIn):
+    d = pdir(pid)
+    st = load_state(d)
+    st["name"] = clean_project_name(body.name)
+    save_state(d, st)
+    return {"name": st["name"]}
 
 
 @app.get("/api/projects/{pid}")
@@ -271,6 +331,7 @@ def get_project(pid: str):
     st.setdefault("music", None)
     st.setdefault("ambience", None)
     st.setdefault("lock_rules", [])
+    st["format"] = project_format(st)
     media = scan_media(d / "input")
     ex = example_path(d)
     trs = load_transcripts(d, media)
@@ -718,9 +779,10 @@ def _plan(d: Path) -> dict:
     if current and not any(c.locked for c in current.clips) and not any(t.locked for t in current.texts):
         current = None
     trs = load_transcripts(d, media)   # the AI sees the transcript even if subtitles are turned off
+    fmt = project_format(st)
     r = plan(preview_media(media, d), st["preset"], st["overrides"], example_path(d), hints, current,
-             music_ctx(d, st), trs)
-    st["edl"] = r["edl"].model_dump(by_alias=True, exclude_none=True)
+             music_ctx(d, st), trs, output_format=fmt)
+    st["edl"] = with_format(r["edl"].model_dump(by_alias=True, exclude_none=True), fmt)
     st["reasoning"], st["usage"] = r["reasoning"], r["usage"]
     st["is_demo"] = None
     save_state(d, st)
@@ -742,8 +804,9 @@ def _plan_variants_job(d: Path, n: int) -> dict:
         if current and not any(c.locked for c in current.clips) and not any(t.locked for t in current.texts):
             current = None
         trs = load_transcripts(d, media)
+        fmt = project_format(st)
         results = plan_variants(preview_media(media, d), st["preset"], st["overrides"], example_path(d), hints,
-                                current, music_ctx(d, st), trs, n=n)
+                                current, music_ctx(d, st), trs, n=n, output_format=fmt)
         out = []
         for r in results:
             if "edl" not in r:
@@ -751,7 +814,7 @@ def _plan_variants_job(d: Path, n: int) -> dict:
                 continue
             out.append({"label": r["label"], "reasoning": r["reasoning"], "usage": r["usage"],
                         "total": total_duration(r["edl"]), "clips": len(r["edl"].clips),
-                        "edl": r["edl"].model_dump(by_alias=True, exclude_none=True)})
+                        "edl": with_format(r["edl"].model_dump(by_alias=True, exclude_none=True), fmt)})
         return {"variants": out}
     finally:
         PLANNING.discard(d.name)
@@ -858,7 +921,7 @@ def export_fcpxml(pid: str):
     media = scan_media(d / "input")
     edl = validate_edl(st["edl"], media)
     mc = music_ctx(d, st)
-    xml = fcpxml.build(edl, media, f"Project {pid}", mc, subtitles_for(d, st, edl, media))
+    xml = fcpxml.build(edl, media, st.get("name") or f"Project {pid}", mc, subtitles_for(d, st, edl, media))
     dst = d / "output" / f"project_{pid}.fcpxml"
     dst.write_bytes(xml)
     return FileResponse(dst, media_type="application/xml", filename=dst.name)
@@ -904,7 +967,7 @@ def select_plan_variant(pid: str, body: SelectVariantIn):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(422, str(e))
     st = load_state(d)
-    st["edl"] = edl.model_dump(by_alias=True, exclude_none=True)
+    st["edl"] = with_format(edl.model_dump(by_alias=True, exclude_none=True), project_format(st))
     st["reasoning"], st["usage"] = body.reasoning, body.usage
     st["is_demo"] = None
     save_state(d, st)

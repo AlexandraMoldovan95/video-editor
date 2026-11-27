@@ -17,7 +17,7 @@
 |---|---|
 | **What** | Local web app: FastAPI backend, single-file JS frontend, ffmpeg for rendering, Claude for the editing decisions. Windows. |
 | **My role** | Product idea, UX, the "AI decides, code executes" architecture, and all testing. Built in pair-programming with Claude — see [How it was built](#how-it-was-built). |
-| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). The edit-plan validation (the code that checks the AI's JSON before anything renders) has 27 automated tests in [`tests/test_edl.py`](tests/test_edl.py). The AI request loop has 16 more in [`tests/test_planner_loop.py`](tests/test_planner_loop.py): what happens when a reply is cut off, refused, plain text instead of a tool call, an invalid plan, or two tool calls at once, using a fake AI client, so no API call is made. And 6 in [`tests/test_api_key.py`](tests/test_api_key.py) check that the AI routes report a missing API key at once, without starting a job. All 49 run in CI on every push; rendering, audio and the UI are still tested by hand. |
+| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). The edit-plan validation (the code that checks the AI's JSON before anything renders) has 27 automated tests in [`tests/test_edl.py`](tests/test_edl.py). The AI request loop has 16 more in [`tests/test_planner_loop.py`](tests/test_planner_loop.py): what happens when a reply is cut off, refused, plain text instead of a tool call, an invalid plan, or two tool calls at once, using a fake AI client, so no API call is made. And 6 in [`tests/test_api_key.py`](tests/test_api_key.py) check that the AI routes report a missing API key at once, without starting a job, and 11 in [`tests/test_projects.py`](tests/test_projects.py) cover project names and the output formats (in a temporary projects folder). All 60 run in CI on every push; rendering, audio and the UI are still tested by hand. |
 | **Status** | Personal/portfolio project, all planned features implemented. Two (Whisper subtitles, DaVinci import) are still untested on a normal install — see [Known limitations](#known-limitations-honest). |
 
 ## Why it exists
@@ -54,7 +54,10 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Live quick-preview: only re-encodes the clips you changed, kept fully separate from the real export path so a low-quality preview can never leak into a final render.
 - Optional subtitles (Whisper), recalculated live from the current timeline so they never go out of sync with your edits.
 - Export a finished MP4, or an FCPXML timeline that reopens your *original* files in DaVinci Resolve / Final Cut.
-- Try 3 demo edits instantly, no API key needed. Without a key, the AI button says so in plain words and points to these demos.
+- Three formats per project: vertical 9:16 (Reels, TikTok, Shorts), square 1:1 (feed posts) or horizontal 16:9 (YouTube); switching re-sizes the current plan, and new plans follow it.
+- Save the frame you paused on as a cover image (JPG, at the rendered video's size).
+- Projects have names ("Hike with Ana"), asked for when you create one and changeable with Rename.
+- Try 3 demo edits instantly, no API key needed. Without a key, the AI button says so at once, in plain words, and points to these demos.
 
 Everything above is optional and toggleable — a Settings panel keeps the interface uncluttered, and a right-click menu on a clip mirrors the main actions.
 

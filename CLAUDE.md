@@ -4,7 +4,7 @@
 
 ## 1. What the app does
 
-The user supplies raw material — video clips, photos, optionally a song and an example edited video — plus a style preset and notes. The app produces a short vertical (9:16) video for social media: it orders the clips, cuts them, applies color correction, and adds on-screen text and visual elements where it helps. An AI (Claude) proposes the edit; the user can adjust or lock any part of it and regenerate only what's left.
+The user supplies raw material — video clips, photos, optionally a song and an example edited video — plus a style preset and notes. The app produces a short video for social media, vertical (9:16) by default, or square (1:1) or horizontal (16:9) per project: it orders the clips, cuts them, applies color correction, and adds on-screen text and visual elements where it helps. An AI (Claude) proposes the edit; the user can adjust or lock any part of it and regenerate only what's left.
 
 **Who it's for:** anyone editing short clips for social media who wants a fast first draft instead of starting from a blank timeline.
 
@@ -16,7 +16,7 @@ The user supplies raw material — video clips, photos, optionally a song and an
 4. **AI** (Claude API, `claude-sonnet-5-5`) — receives the frames + metadata + rules → returns an edit plan.
 5. **Validation** — the plan is checked before anything is rendered.
 6. **Rendering** with ffmpeg.
-7. **Output** — MP4 (H.264 + AAC), 1080×1920, 30 fps by default.
+7. **Output** — MP4 (H.264 + AAC), 30 fps by default, at the project's format: 1080×1920 (9:16, the default), 1080×1080 (1:1) or 1920×1080 (16:9). The project stores its `format`; `with_format` sets every new plan (AI, variant, demo) to it, and changing it re-sizes the current plan. Rendering and FCPXML read `edl.output`; the planner is told the format and which clip shape gets a plain centre crop.
 
 ## 3. Architecture rules (non-negotiable)
 
@@ -83,7 +83,7 @@ uvicorn app.main:app --port 8000      # -> http://localhost:8000
 python -m app.render edl_examples/test_manual.json            # draft, half resolution
 python -m app.render edl_examples/test_manual.json --final    # full 1080x1920
 python -m app.planner --preset travel_cinematic --dry-run     # see the prompt, no API call
-python -m pytest -q                                           # plan validation (tests/test_edl.py) + AI request loop with a fake client (tests/test_planner_loop.py) + missing-key check on the AI routes (tests/test_api_key.py); CI runs them on every push
+python -m pytest -q                                           # plan validation (tests/test_edl.py) + AI request loop with a fake client (tests/test_planner_loop.py) + missing-key check on the AI routes (tests/test_api_key.py) + project names and output formats (tests/test_projects.py); CI runs them on every push
 ```
 
 **The server runs without `--reload`.** Any change to backend code (`app/*.py`) needs a manual restart to take effect.
@@ -170,5 +170,6 @@ Verified with a real end-to-end test, not just "starts without error": uploading
 - The user's original files are never modified or deleted automatically.
 - A new plan (a demo, a regenerate, a picked variant) never silently wipes hand edits: `confirmReplacePlan` asks first when the plan was edited by hand, and `keepUndoAfterReplace` keeps the previous plan one Undo away. Error messages meant for the person editing are in plain words (e.g. `friendlyAiError` for a missing API key); technical detail stays in the server's logs.
 - `validate_edl`'s messages stay as they are: the planner sends them back to Claude for a correction, and they count clips from 0 like the JSON. The page translates them for the person editing (`friendlyEdlError`, clip numbers from 1 as on screen); a new message in `edl.py` needs a matching rule there, or it shows untranslated.
+- Projects can have a name (`state.json` "name", cleaned by `clean_project_name`; unnamed ones show their id), asked for on "+ New project" and changed with Rename. The cover is saved in the page from the player's current frame (no server route), at the rendered video's size.
 - A first visit starts in simple mode (`SIMPLE_FEATURES`: example video, DaVinci, SFX/ambience, deep scan, lock rules, variants and B-roll off); the header's Simple / All features switch and Settings change it, saved in `localStorage`.
 - Every major feature that adds UI surface gets a toggle in the Settings panel (`FEATURES`), so the interface stays as uncluttered as the user wants it; a right-click context menu on a clip offers quick access to actions that already exist as buttons elsewhere — it's a shortcut, never a new capability.

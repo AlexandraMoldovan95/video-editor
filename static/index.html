@@ -99,14 +99,16 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .clip .ix{color:var(--muted);font-variant-numeric:tabular-nums;padding-top:4px}
 .clip img{width:64px;height:64px;object-fit:cover;border-radius:5px}
 .clip .src{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.clip .ctrl{display:flex;flex-direction:column;gap:4px}
+/* the clip's buttons wrap in two short rows instead of one tall column: a card is about half as
+   tall, so a plan of eleven clips no longer needs a long scroll */
+.clip .ctrl{display:flex;flex-wrap:wrap;justify-content:flex-end;align-content:flex-start;gap:4px;max-width:140px}
 .clip .det{grid-column:2/5}
 .lockbtn.on{background:var(--lock);border-color:var(--lock);color:#0a1330}
 .reason{background:var(--panel2);border-left:3px solid var(--acc);padding:10px 12px;border-radius:6px;line-height:1.45;margin-bottom:10px}
 .itemreason{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-style:italic;opacity:.85}
 .status{font-size:12.5px;padding:8px 10px;border-radius:7px;background:var(--panel2);margin-top:8px}
 .status.err{color:var(--err)}.status.ok{color:var(--ok)}
-.preview video{width:100%;aspect-ratio:9/16;background:#000;border-radius:8px}
+.preview video{width:100%;aspect-ratio:var(--player-ar,9/16);background:#000;border-radius:8px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12.5px}
 .kv span:nth-child(odd){color:var(--muted)}
 .energy{display:flex;align-items:flex-end;height:34px;gap:1px;margin:6px 0 2px;cursor:pointer}
@@ -163,6 +165,7 @@ button.ghost{background:transparent;border-color:var(--line)}
 <header>
   <h1>Video <span>Editor</span></h1>
   <select id="projSel" title="Projects"></select>
+  <button class="small ghost" id="renameProj" title="Give this project a name">✎ Rename</button>
   <button id="newProj">+ New project</button>
   <div class="sp"></div>
   <span class="hint" id="usage"></span>
@@ -337,6 +340,14 @@ button.ghost{background:transparent;border-color:var(--line)}
   <section class="col preview">
     <h2>3 · Preview &amp; export</h2>
     <div class="sec">
+      <div class="row" style="margin-bottom:8px">
+        <label class="hint" for="formatSel">Format</label>
+        <select id="formatSel" title="The shape of the finished video">
+          <option value="9:16">Vertical 9:16 · Reels, TikTok, Shorts</option>
+          <option value="1:1">Square 1:1 · feed posts</option>
+          <option value="16:9">Horizontal 16:9 · YouTube</option>
+        </select>
+      </div>
       <video id="player" controls playsinline></video>
       <div class="row" style="margin-top:10px">
         <button class="primary" id="draftBtn">Render draft</button>
@@ -351,10 +362,14 @@ button.ghost{background:transparent;border-color:var(--line)}
         <input type="checkbox" id="muteChk"> Export without music
       </label>
       <div class="hint" id="muteHint" hidden style="margin-top:2px">Cuts stay on the track's beat. For TikTok/Reels: add the same track from within the app (licensed, no mute/claim).</div>
-      <div class="hint" style="margin-top:6px"><b>Quick preview</b>: a fast, small look at your edit (~270×480). <b>Draft</b>: to check the finished video (540×960). <b>Final</b>: full quality for posting (1080×1920).</div>
+      <div class="hint" id="sizesHint" style="margin-top:6px"><b>Quick preview</b>: a fast, small look at your edit (~270×480). <b>Draft</b>: to check the finished video (540×960). <b>Final</b>: full quality for posting (1080×1920).</div>
       <div class="status" id="renderStatus" hidden></div>
       <div class="row" style="margin-top:8px"><a id="dl" class="dlbtn" hidden download>⬇ Download</a></div>
       <div class="hint" id="dlHint" style="margin-top:4px" hidden></div>
+      <div id="coverRow" style="margin-top:10px" hidden>
+        <button class="small" id="coverBtn">🖼 Save this frame as the cover</button>
+        <div class="hint" id="coverHint" style="margin-top:3px">Pause the video on the moment you like, then save it as an image to pick as your post's cover.</div>
+      </div>
       <div class="panel" id="davinciPanel">
         <h3>Continue in DaVinci Resolve</h3>
         <div class="hint">Editable timeline with the <b>original</b> files: order, cuts, framing, transitions (as Cross Dissolve), volume, music, texts.
@@ -568,7 +583,15 @@ async function init() {
 function localStorageGet(k) { try { return localStorage.getItem(k) } catch { return null } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v) } catch {} }
 function fillProjects(list) {
-  $('#projSel').innerHTML = list.map(p => `<option value="${p.id}">Project ${p.id} · ${p.files} files</option>`).join('');
+  // a project shows its own name ("Hike with Ana") once it has one; until then its id
+  $('#projSel').innerHTML = list.map(p => `<option value="${p.id}">${p.name ? esc(p.name) : `Project ${p.id}`} · ${p.files} files</option>`).join('');
+}
+async function nameProject(id, current) {
+  const name = prompt('Name this project (for example "Hike with Ana"):', current || '');
+  if (name === null) return;   // Cancel keeps the old name
+  const r = await api(`/api/projects/${id}/name`, jsonOpt('PUT', {name}));
+  if (P && P.id === id) P.name = r.name;
+  fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
 }
 async function loadProject(id) {
   P = await api(`/api/projects/${id}`);
@@ -576,11 +599,17 @@ async function loadProject(id) {
   $('#projSel').value = id;
   selFile = null; selClip = null; clearHistory(); WAVEFORMS = {}; FILMSTRIPS = {};
   renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderAmbience(); renderLockRules(); renderOverlays(); renderPlan(); renderDemoBtns();
-  $('#player').removeAttribute('src'); $('#dl').hidden = true; $('#dlHint').hidden = true;
+  $('#player').removeAttribute('src'); $('#dl').hidden = true; $('#dlHint').hidden = true; $('#coverRow').hidden = true;
+  renderFormat();
 }
 async function refresh() { P = await api(`/api/projects/${P.id}`); }
 $('#projSel').onchange = e => loadProject(e.target.value);
-$('#newProj').onclick = async () => { const r = await api('/api/projects', {method: 'POST'}); fillProjects(await api('/api/projects')); loadProject(r.id) };
+$('#newProj').onclick = async () => {
+  const r = await api('/api/projects', {method: 'POST'});
+  fillProjects(await api('/api/projects')); await loadProject(r.id);
+  await nameProject(r.id, '');   // optional: Cancel leaves it unnamed
+};
+$('#renameProj').onclick = () => P && nameProject(P.id, P.name);
 
 // ---------------- upload ----------------
 const drop = $('#drop');
@@ -1989,6 +2018,55 @@ function bindTimelineDrag(area) {
 }
 
 // ---------------- render ----------------
+// ---------------- output format: vertical 9:16, square 1:1, horizontal 16:9 ----------------
+// The project remembers it on the server; a change re-sizes the current plan there, and every new
+// plan (AI, variant, demo) gets it too. Here: the picker, the player's shape and the sizes shown.
+const FORMAT_SIZES = {'9:16': [1080, 1920], '1:1': [1080, 1080], '16:9': [1920, 1080]};
+function renderFormat() {
+  const f = FORMAT_SIZES[P && P.format] ? P.format : '9:16';
+  const [w, h] = FORMAT_SIZES[f];
+  $('#formatSel').value = f;
+  $('#player').style.setProperty('--player-ar', `${w}/${h}`);
+  $('#sizesHint').innerHTML = `<b>Quick preview</b>: a fast, small look at your edit (~${w / 4}×${h / 4}). `
+    + `<b>Draft</b>: to check the finished video (${w / 2}×${h / 2}). <b>Final</b>: full quality for posting (${w}×${h}).`;
+}
+$('#formatSel').onchange = async e => {
+  const format = e.target.value;
+  try {
+    await saveEdl.flush();   // the server re-sizes the saved plan: hand edits must be saved first
+    const r = await api(`/api/projects/${P.id}/format`, jsonOpt('PUT', {format}));
+    P.format = r.format; P.edl = r.edl;
+    renderFormat(); renderPlan();
+    alertStatus('#renderStatus', 'Format changed. Render again to see the new shape.', false, true);
+  } catch (err) { alertStatus('#renderStatus', err.message, true); renderFormat() }
+};
+
+// ---------------- cover image: the frame the player shows, saved as a JPG ----------------
+// Drawn from the player itself (the rendered video is served by this same app, so the canvas can
+// read it); its size is the video's: a final render gives a full-size cover, a preview a small one.
+$('#player').addEventListener('loadeddata', () => {
+  const v = $('#player');
+  if (!v.videoWidth) return;
+  $('#coverRow').hidden = false;
+  $('#coverHint').textContent = `Pause the video on the moment you like, then save it as an image (${v.videoWidth}×${v.videoHeight}) to pick as your post's cover.`
+    + (v.videoWidth < 1000 ? ' Render final first for a full-size one.' : '');
+});
+$('#coverBtn').onclick = () => {
+  const v = $('#player');
+  if (!v.videoWidth) return;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  c.toBlob(b => {
+    if (!b) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = `cover-${fmt(v.currentTime)}s.jpg`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }, 'image/jpeg', 0.92);
+};
+
 async function doRender(final) {
   if (!P.edl) return alertStatus('#renderStatus', 'Generate a plan first', true);
   $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = true;
