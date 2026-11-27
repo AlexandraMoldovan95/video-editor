@@ -61,7 +61,9 @@
   .hero{padding:52px 0 36px;}
   .eyebrow{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
   .hero h1{font-size:34px;margin:0 0 14px;}
-  .hero .pitch{font-size:16px;color:var(--muted);line-height:1.6;max-width:680px;margin:0 0 24px;}
+  /* Text blocks stay under ~75 characters per line (em, not px, so it holds at any font size;
+     they ran 97-132 before). */
+  .hero .pitch{font-size:16px;color:var(--muted);line-height:1.6;max-width:36em;margin:0 0 24px;}
   .hero .pitch strong{color:var(--text);}
   .cta-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;}
   .btn{display:inline-block;border-radius:8px;padding:10px 18px;font-size:14px;border:1px solid var(--line);color:var(--text);}
@@ -87,12 +89,13 @@
   section{padding:40px 0;border-top:1px solid var(--line);}
   .section-head{margin-bottom:22px;}
   .section-head h2{font-size:22px;margin:0 0 6px;}
-  .section-head p{color:var(--muted);font-size:14px;line-height:1.6;max-width:680px;margin:0;}
+  .section-head p{color:var(--muted);font-size:14px;line-height:1.6;max-width:36em;margin:0;}
 
   /* demo */
   .demo-banner{
     background:var(--panel2);border:1px solid var(--line);border-radius:10px;
-    padding:14px 18px;margin-bottom:22px;font-size:13px;color:var(--muted);line-height:1.6;
+    padding:14px 18px;margin-bottom:22px;font-size:13.5px;color:var(--muted);line-height:1.6;
+    max-width:calc(38em + 36px);
   }
   .demo-banner strong{color:var(--text);}
   .demo-banner a{color:var(--acc2);}
@@ -104,36 +107,40 @@
   .shell-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel2);}
   .shell-header h3{font-size:15px;margin:0;font-weight:650;}
   .shell-header h3 span{color:var(--acc);}
-  .shell-header .count{font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:2px 8px;margin-left:auto;}
+  .shell-header .count{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:2px 8px;margin-left:auto;}
   .demo-grid{display:grid;grid-template-columns:260px 1fr 260px;gap:1px;background:var(--line);}
   @media (max-width:980px){.demo-grid{grid-template-columns:1fr;}}
   .demo-col{background:var(--bg);padding:16px;overflow:auto;}
-  .demo-col h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0 0 10px;font-weight:650;}
+  .demo-col h4{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0 0 10px;font-weight:650;}
   .thumb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .thumb-card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   .thumb-card img{width:100%;height:84px;object-fit:cover;display:block;background:#000;}
-  .thumb-card .nm{font-size:10.5px;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .thumb-card .mt{font-size:10px;color:var(--muted);padding:0 6px 5px;}
+  /* The demo's small print: 12px at least (it was 10-11px). */
+  .thumb-card .nm{font-size:12px;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .thumb-card .mt{font-size:12px;color:var(--muted);padding:0 6px 5px;}
   .preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
   .preset-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;
     padding:6px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;}
   .preset-btn:hover{border-color:var(--muted);}
   .preset-btn.active{background:var(--acc);border-color:var(--acc);color:#1a0d06;font-weight:650;}
   .chip-row2{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
-  .vchip{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+  .vchip{font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);
     border-radius:5px;padding:3px 8px;}
-  .reasoning-box{background:var(--panel2);border-left:3px solid var(--acc);border-radius:6px;
-    padding:10px 12px;font-size:12.5px;color:var(--text);line-height:1.5;margin-bottom:14px;}
+  /* The AI's reasoning: a plain bordered box with a small label above it (it had a thick orange
+     stripe on the left, a card shape AI site generators use everywhere). */
+  .reasoning-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px;font-weight:650;}
+  .reasoning-box{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+    padding:10px 12px;font-size:13px;color:var(--text);line-height:1.5;margin-bottom:14px;}
   .reasoning-box.empty{color:var(--muted);font-style:italic;}
   .clip-row{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:7px;}
-  .clip-row .cn{font-size:11px;color:var(--muted);}
-  .clip-row .cf{font-size:12.5px;font-weight:600;margin:2px 0 3px;word-break:break-all;}
-  .clip-row .cd{font-size:11.5px;color:var(--muted);}
-  .clip-row .cv{font-size:11px;color:#8ea2c6;margin-top:3px;}
-  .clip-row .ct{font-size:10.5px;color:var(--muted);margin-top:3px;font-style:italic;}
+  .clip-row .cn{font-size:12px;color:var(--muted);}
+  .clip-row .cf{font-size:13px;font-weight:600;margin:2px 0 3px;word-break:break-all;}
+  .clip-row .cd{font-size:12.5px;color:var(--muted);}
+  .clip-row .cv{font-size:12px;color:#8ea2c6;margin-top:3px;}
+  .clip-row .ct{font-size:12px;color:var(--muted);margin-top:3px;font-style:italic;}
   .preview-box{background:#000;border-radius:8px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px;}
   .preview-box video{width:100%;display:block;}
-  .preview-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:14px;}
+  .preview-note{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:14px;}
   .fake-btn{display:block;width:100%;text-align:center;background:var(--panel2);border:1px solid var(--line);
     color:var(--muted);border-radius:7px;padding:8px;font-size:12.5px;margin-bottom:6px;cursor:not-allowed;}
 
@@ -162,14 +169,14 @@
 
   /* prose / highlights / limitations - new content blocks */
   .quote{border-left:3px solid var(--acc);padding:4px 0 4px 18px;margin:0 0 18px;color:var(--muted);font-style:italic;font-size:15px;line-height:1.6;}
-  .prose p{color:var(--muted);font-size:14.5px;line-height:1.7;max-width:720px;margin:0;}
+  .prose p{color:var(--muted);font-size:14.5px;line-height:1.7;max-width:36em;margin:0;}
   .prose strong{color:var(--text);}
   .highlight-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px;max-width:760px;}
-  .highlight-list li{font-size:14px;color:var(--muted);line-height:1.65;padding-left:22px;position:relative;}
+  .highlight-list li{font-size:14px;color:var(--muted);line-height:1.65;padding-left:22px;position:relative;max-width:calc(36em + 22px);}
   .highlight-list li::before{content:"✓";position:absolute;left:0;color:var(--ok);font-weight:650;}
   .highlight-list li strong{color:var(--text);}
   .limits{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;max-width:760px;}
-  .limits li{font-size:13.5px;color:var(--muted);line-height:1.6;padding-left:18px;position:relative;}
+  .limits li{font-size:13.5px;color:var(--muted);line-height:1.6;padding-left:18px;position:relative;max-width:calc(36em + 18px);}
   .limits li::before{content:"–";position:absolute;left:0;color:var(--acc);}
   .limits li strong{color:var(--text);}
 
@@ -199,7 +206,7 @@
       <div class="hero-text">
       <div class="eyebrow">Python · FastAPI · ffmpeg · local web app</div>
       <h1>Video Editor</h1>
-      <p class="pitch">Turns raw clips and photos into a finished vertical (9:16) video for social media. <strong>Claude proposes the cut</strong>, the color and the on-screen text — the code validates the plan and renders it with ffmpeg, so the AI never touches ffmpeg directly. You stay in control: change or lock anything before it renders.</p>
+      <p class="pitch">Turns raw clips and photos into a finished vertical (9:16) video for social media. <strong>Claude proposes the cut</strong>, the color and the on-screen text; the code validates the plan and renders it with ffmpeg, so the AI never touches ffmpeg directly. You stay in control: change or lock anything before it renders.</p>
 
       <div class="cta-row">
         <a href="#demo" class="btn btn-accent">Try it below ↓</a>
@@ -231,11 +238,11 @@
     <div class="wrap">
       <div class="section-head">
         <h2>Play with it</h2>
-        <p>A real, saved project — the same ten sample clips and photos the app was tested with — not a live install.</p>
+        <p>A real, saved project: the same ten sample clips and photos the app was tested with, not a live install.</p>
       </div>
 
       <div class="demo-banner">
-        <strong>Static demo, not the live app.</strong> Everything below is real — the sample footage, the AI-generated edit plan and its reasoning, the per-clip color numbers, and the rendered video — but nothing here is running: this page doesn't call ffmpeg or the Claude API. Switching the preset swaps between three real, pre-built plans using plain JavaScript. The actual app needs ffmpeg and your own Anthropic API key, and runs as a local web server on your own machine — see <a href="https://github.com/AlexandraMoldovan95/video-editor" target="_blank" rel="noopener">the source on GitHub</a> to run it yourself.
+        <strong>Static demo, not the live app.</strong> Everything below is real (the sample footage, the AI-generated edit plan and its reasoning, the per-clip color numbers, and the rendered video), but nothing here is running: this page doesn't call ffmpeg or the Claude API. Switching the preset swaps between three real, pre-built plans using plain JavaScript. The actual app needs ffmpeg and your own Anthropic API key, and runs as a local web server on your own machine. See <a href="https://github.com/AlexandraMoldovan95/video-editor" target="_blank" rel="noopener">the source on GitHub</a> to run it yourself.
       </div>
 
       <div class="shell">
@@ -254,6 +261,7 @@
             <h4>2 · Edit plan</h4>
             <div class="preset-row" id="preset-row"></div>
             <div class="chip-row2" id="chip-row"></div>
+            <p class="reasoning-label">The AI's reasoning</p>
             <div class="reasoning-box" id="reasoning-box"></div>
             <div id="timeline-list"></div>
           </div>
@@ -265,7 +273,7 @@
                 <source src="images/video-editor-demo/draft.mp4" type="video/mp4">
               </video>
             </div>
-            <p class="preview-note">Real rendered draft (540×960, the app's fast-preview resolution) from the "Cinematic travel story" plan, rendered by the actual ffmpeg pipeline — not a mockup.</p>
+            <p class="preview-note">Real rendered draft (540×960, the app's fast-preview resolution) from the "Cinematic travel story" plan, rendered by the actual ffmpeg pipeline, not a mockup.</p>
             <button class="fake-btn" disabled title="Needs the real app">Render final</button>
             <button class="fake-btn" disabled title="Needs the real app">⚡ Quick preview</button>
           </div>
@@ -278,9 +286,9 @@
   <section id="why" class="reveal">
     <div class="wrap">
       <div class="section-head"><h2>Why this exists</h2></div>
-      <blockquote class="quote">Hand-editing a 30-second reel — picking the best seconds, cutting to a beat, adding text — easily takes an hour. I wanted a tool that gets a solid first draft in about two minutes.</blockquote>
+      <blockquote class="quote">Hand-editing a 30-second reel (picking the best seconds, cutting to a beat, adding text) easily takes an hour. I wanted a tool that gets a solid first draft in about two minutes.</blockquote>
       <div class="prose">
-        <p>You drop in your clips and photos, pick a style, and the AI plans the edit — order, cuts, color, text. You stay in control: adjust anything, lock the cuts and texts that already work, and regenerate only what's left. The interesting part wasn't getting an AI to suggest an edit; it was drawing a hard line between <strong>what the AI is allowed to decide</strong> and <strong>what the code enforces regardless of what the AI proposes</strong> — the AI never writes a single ffmpeg command.</p>
+        <p>You drop in your clips and photos, pick a style, and the AI plans the edit: order, cuts, color, text. You stay in control: adjust anything, lock the cuts and texts that already work, and regenerate only what's left. The interesting part wasn't getting an AI to suggest an edit; it was drawing a hard line between <strong>what the AI is allowed to decide</strong> and <strong>what the code enforces regardless of what the AI proposes</strong>. The AI never writes a single ffmpeg command.</p>
       </div>
     </div>
   </section>
@@ -289,12 +297,12 @@
     <div class="wrap">
       <div class="section-head">
         <h2>What it does</h2>
-        <p>Everything below is optional and toggleable — a Settings panel keeps the interface uncluttered.</p>
+        <p>Everything below is optional and toggleable: a Settings panel keeps the interface uncluttered.</p>
       </div>
       <div class="feature-grid">
         <div class="feature-block">
           <h3><span class="ico">●</span>AI editing</h3>
-          <p>Claude picks the order, cuts, color and text, and returns a plan the code validates before it ever touches ffmpeg. <strong>Lock</strong> any cut or text you like and regenerating only reworks what's unlocked — standing rules like "keep the opening 3s" apply automatically every time.</p>
+          <p>Claude picks the order, cuts, color and text, and returns a plan the code validates before it ever touches ffmpeg. <strong>Lock</strong> any cut or text you like and regenerating only reworks what's unlocked, and standing rules like "keep the opening 3s" apply automatically every time.</p>
         </div>
         <div class="feature-block">
           <h3><span class="ico">●</span>Manual editing, once the draft lands</h3>
@@ -316,11 +324,11 @@
     <div class="wrap">
       <div class="section-head"><h2>Highlights</h2></div>
       <ul class="highlight-list">
-        <li><strong>"AI decides, code executes."</strong> Claude never touches ffmpeg — it returns a JSON edit plan validated against a strict schema (Pydantic) before any video command runs, so a bad or unexpected response gets rejected and retried once instead of executing anything unvalidated.</li>
-        <li><strong>Lock and regenerate, not start over.</strong> Lock any cut or text that already works and hit Regenerate — only the unlocked parts get reworked. Standing lock rules ("keep the opening 3s", "never touch this file") apply automatically on every pass instead of re-locking by hand each time.</li>
+        <li><strong>"AI decides, code executes."</strong> Claude never touches ffmpeg: it returns a JSON edit plan validated against a strict schema (Pydantic) before any video command runs, so a bad or unexpected response gets rejected and retried once instead of executing anything unvalidated.</li>
+        <li><strong>Lock and regenerate, not start over.</strong> Lock any cut or text that already works and hit Regenerate: only the unlocked parts get reworked. Standing lock rules ("keep the opening 3s", "never touch this file") apply automatically on every pass instead of re-locking by hand each time.</li>
         <li><strong>Beat tracking from scratch.</strong> Custom beat detection in plain numpy, no external library, finds the BPM and beat grid, so cuts and zoom punches can snap to the music while the original clip audio ducks automatically underneath.</li>
-        <li><strong>A robustness pass that actually tried to break it.</strong> A dedicated audit looked for what could crash the server or corrupt a project. One bad upload used to take the whole project down — fixed that and three other real bugs, each verified with an end-to-end test, not just "it ran."</li>
-        <li><strong>A full manual toolkit once the AI draft lands.</strong> Drag-trim, a split tool, per-clip speed, a waveform display, multi-select, free-drag text, and B-roll/picture-in-picture overlays — none of it calls the API, all of it is plain timeline editing.</li>
+        <li><strong>A robustness pass that actually tried to break it.</strong> A dedicated audit looked for what could crash the server or corrupt a project. One bad upload used to take the whole project down. That one and three other real bugs are fixed, each verified with an end-to-end test, not just "it ran."</li>
+        <li><strong>A full manual toolkit once the AI draft lands.</strong> Drag-trim, a split tool, per-clip speed, a waveform display, multi-select, free-drag text, and B-roll/picture-in-picture overlays. None of it calls the API; all of it is plain timeline editing.</li>
       </ul>
     </div>
   </section>
@@ -331,15 +339,15 @@
       <div class="feature-grid">
         <div class="feature-block">
           <h3>Product and design</h3>
-          <p>Product idea, UX, and the <strong>"AI decides, code executes"</strong> boundary — the plan Claude returns is validated against a strict schema before any ffmpeg command runs. Built in pair-programming with Claude, starting from a written requirements doc and working through the pipeline stage by stage.</p>
+          <p>Product idea, UX, and the <strong>"AI decides, code executes"</strong> boundary: the plan Claude returns is validated against a strict schema before any ffmpeg command runs. Built in pair-programming with Claude, starting from a written requirements doc and working through the pipeline stage by stage.</p>
         </div>
         <div class="feature-block">
           <h3>Quality</h3>
-          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. The edit-plan validation has 27 automated tests that run on every push; rendering, audio and the UI are still tested by hand.</p>
+          <p>Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlay compositing, audio timing, beat sync) were checked against purpose-built test clips with exact pixel and frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs. 43 automated tests run on every push: 27 on the edit-plan validation and 16 on the AI request loop, with a fake AI client; rendering, audio and the UI are still tested by hand.</p>
         </div>
         <div class="feature-block">
           <h3>Architecture</h3>
-          <p>The AI never writes ffmpeg: <code>planner.py</code> calls Claude, <code>edl.py</code> validates the plan (overlaps, transitions, text) before <code>render.py</code> runs anything — an invalid plan gets one retry with the validation error attached. Beat tracking, subtitle timing, and the live-preview cache are each isolated so one feature's shortcuts can't leak into another's correctness.</p>
+          <p>The AI never writes ffmpeg: <code>planner.py</code> calls Claude, <code>edl.py</code> validates the plan (overlaps, transitions, text) before <code>render.py</code> runs anything; an invalid plan gets one retry with the validation error attached. Beat tracking, subtitle timing, and the live-preview cache are each isolated so one feature's shortcuts can't leak into another's correctness.</p>
         </div>
       </div>
       <div class="stack-row">
@@ -357,13 +365,13 @@
     <div class="wrap">
       <div class="section-head">
         <h2>Known limitations</h2>
-        <p>Said plainly, not hidden in fine print — part of being honest about what shipped and what didn't.</p>
+        <p>Said plainly, not hidden in fine print: part of being honest about what shipped and what didn't.</p>
       </div>
       <ul class="limits">
         <li><strong>The AI only sees 4 frames per clip.</strong> It picks well on calm footage but can miss the exact right moment in a clip with a lot of action. Workaround: set an allowed range and a note for the AI on that file.</li>
-        <li><strong>Beat tracking is tested on synthetic tracks</strong> (128 and 95 BPM, ~22ms error). On music without a clear drum hit it can get it wrong — turn off "On beat" for that track.</li>
-        <li><strong>Automated tests cover only the plan validation.</strong> The 27 tests check the code that validates the AI's plan; rendering, audio and the UI are still tested by hand — thorough, but it doesn't scale the way an automated suite would.</li>
-        <li><strong>Whisper subtitles and the DaVinci export are implemented but untested on a normal install.</strong> The model download was blocked in the sandboxed environment this was built in — the logic was verified with a simulated transcript and validated against OpenTimelineIO, but neither has run for real yet.</li>
+        <li><strong>Beat tracking is tested on synthetic tracks</strong> (128 and 95 BPM, ~22ms error). On music without a clear drum hit it can get it wrong; turn off "On beat" for that track.</li>
+        <li><strong>Rendering, audio and the UI have no automated tests.</strong> The 43 automated tests cover the plan validation (27) and the AI request loop (16); the rest is tested by hand: thorough, but it doesn't scale the way an automated suite would.</li>
+        <li><strong>Whisper subtitles and the DaVinci export are implemented but untested on a normal install.</strong> The model download was blocked in the sandboxed environment this was built in; the logic was verified with a simulated transcript and validated against OpenTimelineIO, but neither has run for real yet.</li>
       </ul>
     </div>
   </section>
@@ -371,7 +379,7 @@
 
 <footer>
   <div class="wrap" style="text-align:center;">
-    <span style="color:var(--muted);font-size:13px;">Video Editor — MIT License</span>
+    <span style="color:var(--muted);font-size:13px;">Video Editor · MIT License</span>
   </div>
 </footer>
 
@@ -479,7 +487,7 @@ function renderPlan(key){
     rb.textContent = p.reasoning;
   } else {
     rb.className = "reasoning-box empty";
-    rb.textContent = "No AI reasoning for this one — hand-built example matching the preset's own rules, not a live model call.";
+    rb.textContent = "No AI reasoning for this one: a hand-built example matching the preset's own rules, not a live model call.";
   }
 
   document.getElementById("timeline-list").innerHTML = p.clips.map((c, i) => {
