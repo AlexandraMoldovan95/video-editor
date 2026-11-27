@@ -864,10 +864,19 @@ def export_fcpxml(pid: str):
     return FileResponse(dst, media_type="application/xml", filename=dst.name)
 
 
+def require_api_key():
+    """The AI routes fail at once without a key, instead of extracting every clip's frames first
+    and only then finding out. The page turns this message into plain words for the person editing."""
+    from .planner import MISSING_KEY, api_key_configured
+    if not api_key_configured():
+        raise HTTPException(503, MISSING_KEY)
+
+
 @app.post("/api/projects/{pid}/plan")
 def start_plan(pid: str):
     if pid in PLANNING:
         raise HTTPException(409, "A plan is already in progress")
+    require_api_key()
     return {"job": run_job(_plan_job, pdir(pid))}
 
 
@@ -875,6 +884,7 @@ def start_plan(pid: str):
 def start_plan_variants(pid: str, n: int = 3):
     if pid in PLANNING:
         raise HTTPException(409, "A plan is already in progress")
+    require_api_key()
     return {"job": run_job(_plan_variants_job, pdir(pid), max(1, min(n, 3)))}
 
 
@@ -905,6 +915,7 @@ def select_plan_variant(pid: str, body: SelectVariantIn):
 def start_deepscan(pid: str, idx: int):
     if pid in PLANNING:
         raise HTTPException(409, "A plan is already in progress")
+    require_api_key()
     return {"job": run_job(_deepscan_job, pdir(pid), idx)}
 
 

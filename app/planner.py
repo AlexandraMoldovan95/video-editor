@@ -41,12 +41,22 @@ def check_stop(resp, what: str) -> None:
         raise RuntimeError(f"The AI declined to produce the {what}.")
 
 
-def make_client():
-    import anthropic
+MISSING_KEY = "ANTHROPIC_API_KEY is missing from .env"
+
+
+def api_key_configured() -> bool:
+    """True when an Anthropic API key is set (in the environment or in .env). The plan, variants
+    and deep-scan routes check it before starting a job, so a missing key is reported at once
+    instead of after the frames have been extracted (tens of seconds on a busy machine)."""
     from dotenv import load_dotenv
     load_dotenv()
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise RuntimeError("ANTHROPIC_API_KEY is missing from .env")
+    return bool(os.getenv("ANTHROPIC_API_KEY"))
+
+
+def make_client():
+    import anthropic
+    if not api_key_configured():
+        raise RuntimeError(MISSING_KEY)
     # Stated explicitly instead of relying on the SDK defaults. A plan with thinking can
     # legitimately take minutes (the reply arrives in one piece), so the total wait stays at
     # 10 minutes; a connection that can't even be opened fails after 10 seconds. The SDK
