@@ -273,7 +273,7 @@
                 <source src="images/video-editor-demo/draft.mp4" type="video/mp4">
               </video>
             </div>
-            <p class="preview-note">Real rendered draft (540×960, the app's fast-preview resolution) from the "Cinematic travel story" plan, rendered by the actual ffmpeg pipeline, not a mockup.</p>
+            <p class="preview-note">Real rendered draft (540×960, the app's draft size, for checking; Final renders at 1080×1920 for posting) from the "Cinematic travel story" plan, rendered by the actual ffmpeg pipeline, not a mockup.</p>
             <button class="fake-btn" disabled title="Needs the real app">Render final</button>
             <button class="fake-btn" disabled title="Needs the real app">⚡ Quick preview</button>
           </div>
@@ -461,6 +461,16 @@ function fmtNum(n){
   return s === "" || s === "-" ? "0" : s;
 }
 function signed(n){ return (n >= 0 ? "+" : "") + fmtNum(n); }
+// The clip's colour in words, only what differs from the original, as the app shows it
+// ("Colour: contrast 1.2× · saturation 1.15×"; it used to read "B 0 · C 1.2× · S 1.15× · W 0").
+function colourSummary(c){
+  const parts = [];
+  if (Math.abs((c.brightness ?? 0)) > 1e-6) parts.push(`brightness ${signed(c.brightness)}`);
+  if (Math.abs((c.contrast ?? 1) - 1) > 1e-6) parts.push(`contrast ${fmtNum(c.contrast)}×`);
+  if (Math.abs((c.saturation ?? 1) - 1) > 1e-6) parts.push(`saturation ${fmtNum(c.saturation)}×`);
+  if (Math.abs((c.warmth ?? 0)) > 1e-6) parts.push(`warmth ${signed(c.warmth)}`);
+  return parts.length ? `Colour: ${parts.join(" · ")}` : "Colour: unchanged";
+}
 
 function renderMaterial(){
   const grid = document.getElementById("material-grid");
@@ -500,7 +510,7 @@ function renderPlan(key){
         <div class="cn">${i + 1}</div>
         <div class="cf">${c.source}</div>
         <div class="cd">${range} · ${fit}</div>
-        <div class="cv">B ${signed(c.brightness)} · C ${fmtNum(c.contrast)}× · S ${fmtNum(c.saturation)}× · W ${signed(c.warmth)}</div>
+        <div class="cv">${colourSummary(c)}</div>
         ${trLabel}
       </div>`;
   }).join("");
