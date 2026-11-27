@@ -35,7 +35,8 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Per-file overrides the AI can't fight: mark a clip required or excluded, lock its usable range, fix its color — the code enforces these as hard limits.
 
 **Manual editing, once the AI draft lands**
-- Full NLE-style toolkit: undo/redo, keyboard shortcuts, drag-trim, a split tool, per-clip speed (0.25×–4×), manual pan/reframe, a waveform display, multi-select.
+- Full NLE-style toolkit: undo/redo, keyboard shortcuts, drag-trim, a split tool, per-clip speed (0.25×–4×, with ½× / 1× / 2× / 4× buttons), manual pan/reframe, a waveform display, multi-select.
+- A demo, a regenerate or a picked variant asks before it replaces your hand edits, and the previous plan stays one Undo away.
 - B-roll, picture-in-picture, and split-screen overlays.
 - J/L cuts — a clip's sound can start early or run past its picture, the way editors hide a hard cut.
 - Beat-synced zoom punches on the music.
@@ -51,7 +52,7 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Live quick-preview: only re-encodes the clips you changed, kept fully separate from the real export path so a low-quality preview can never leak into a final render.
 - Optional subtitles (Whisper), recalculated live from the current timeline so they never go out of sync with your edits.
 - Export a finished MP4, or an FCPXML timeline that reopens your *original* files in DaVinci Resolve / Final Cut.
-- Try 3 demo edits instantly, no API key needed.
+- Try 3 demo edits instantly, no API key needed. Without a key, the AI button says so in plain words and points to these demos.
 
 Everything above is optional and toggleable — a Settings panel keeps the interface uncluttered, and a right-click menu on a clip mirrors the main actions.
 

@@ -168,4 +168,5 @@ Verified with a real end-to-end test, not just "starts without error": uploading
 
 - Generated files go into `output/` (drafts into `output/drafts/`), never over the source material.
 - The user's original files are never modified or deleted automatically.
+- A new plan (a demo, a regenerate, a picked variant) never silently wipes hand edits: `confirmReplacePlan` asks first when the plan was edited by hand, and `keepUndoAfterReplace` keeps the previous plan one Undo away. Error messages meant for the person editing are in plain words (e.g. `friendlyAiError` for a missing API key); technical detail stays in the server's logs.
 - Every major feature that adds UI surface gets a toggle in the Settings panel (`FEATURES`), so the interface stays as uncluttered as the user wants it; a right-click context menu on a clip offers quick access to actions that already exist as buttons elsewhere — it's a shortcut, never a new capability.
