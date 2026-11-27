@@ -54,9 +54,9 @@ def api_key_configured() -> bool:
 
 
 def make_client():
-    import anthropic
-    if not api_key_configured():
+    if not api_key_configured():   # before importing the SDK: nothing to load without a key
         raise RuntimeError(MISSING_KEY)
+    import anthropic
     # Stated explicitly instead of relying on the SDK defaults. A plan with thinking can
     # legitimately take minutes (the reply arrives in one piece), so the total wait stays at
     # 10 minutes; a connection that can't even be opened fails after 10 seconds. The SDK
