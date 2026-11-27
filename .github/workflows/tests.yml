@@ -1,7 +1,7 @@
 # Runs the automated tests on every push and pull request: the edit-plan validation
-# (tests/test_edl.py), the AI request loop with a fake client (tests/test_planner_loop.py) and
-# the missing-key check on the AI routes (tests/test_api_key.py) and project names and output
-# formats (tests/test_projects.py, in a temporary projects folder).
+# (tests/test_edl.py), the AI request loop with a fake client (tests/test_planner_loop.py), the
+# missing-key check on the AI routes and in /api/config (tests/test_api_key.py), and project names,
+# output formats and removing a file (tests/test_projects.py, in a temporary projects folder).
 # They need pydantic and numpy (app/music.py, imported by the planner), plus fastapi,
 # python-multipart, python-dotenv and httpx to load the app and call its routes in-process:
 # no ffmpeg, no API key, nothing secret, and no call to the real API.

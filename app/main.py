@@ -19,7 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .demo_presets import DEMO_PRESETS
-from .edl import EDL, clamp_transitions, overlap_errors, text_errors, total_duration, validate_edl
+from .edl import (EDL, clamp_audio_trim, clamp_transitions, overlap_errors, overlay_errors, text_errors,
+                  total_duration, validate_edl)
 from .frames import extract_frames, thumbnail
 from .hints import FileHint
 from .lockrules import LockRule, apply_lock_rules
@@ -185,7 +186,14 @@ def run_job(fn, *args) -> str:
 def config():
     return {"presets": {k: v.model_dump() for k, v in PRESETS.items()},
             "custom_keys": sorted(CUSTOM_KEYS), "custom_presets": list_custom_presets(),
-            "pace_range": PACE_RANGE, "color_base": COLOR_BASE}
+            "pace_range": PACE_RANGE, "color_base": COLOR_BASE, "ai_ready": ai_ready()}
+
+
+def ai_ready() -> bool:
+    """Whether an Anthropic API key is set, so the page can hide what only the AI can use
+    instead of showing controls that fail when clicked. Says nothing about the key itself."""
+    from .planner import api_key_configured
+    return api_key_configured()
 
 
 # ---------- custom presets (save the current preset+overrides under a name, reuse it later) ----------
@@ -585,8 +593,52 @@ def delete_media(pid: str, name: str):
     proxy_path(d, name).with_suffix(".tmp.mp4").unlink(missing_ok=True)
     st = load_state(d)
     st["hints"].pop(name, None)
+    # a "never touch clips from <file>" rule for a file that's gone has nothing left to protect
+    st["lock_rules"] = [r for r in st.get("lock_rules", []) if r.get("source") != name]
+    removed = drop_source_from_plan(st, name)
     save_state(d, st)
-    return {"deleted": name}
+    return {"deleted": name, "removed_clips": removed}
+
+
+def drop_source_from_plan(st: dict, name: str) -> list[int]:
+    """Removing a file used to leave its clips in the plan: the next edit then failed to save
+    ("uses a file that isn't in this project any more") and Render used the old saved plan. The
+    file's clips and B-roll leave the plan with it; whatever now starts after the shorter video's
+    end goes too, and transitions are shortened to fit. Returns the removed clips' numbers as the
+    person sees them (counted from 1). No clips left -> no plan, as in a new project."""
+    raw = st.get("edl")
+    if not raw:
+        return []
+    clips = raw.get("clips") or []
+    removed = [i + 1 for i, c in enumerate(clips) if c.get("source") == name]
+    overlays = [o for o in raw.get("overlays") or [] if o.get("source") != name]
+    if not removed and len(overlays) == len(raw.get("overlays") or []):
+        return []
+    st["is_demo"] = None   # no longer the untouched example plan
+    kept = [c for c in clips if c.get("source") != name]
+    if not kept:
+        st["edl"] = None
+        return removed
+    raw = {**raw, "clips": kept, "overlays": overlays}
+    try:
+        edl = EDL.model_validate(raw)
+    except Exception:  # noqa: BLE001 - a plan that was already invalid: just drop the file's items
+        st["edl"] = raw
+        return removed
+    total = total_duration(edl)
+    # same margins the checks use (a text must also stay on screen 0.5 s, an overlay 0.3 s)
+    edl.texts = [t for t in edl.texts if t.start < total - 0.5]
+    for t in edl.texts:
+        t.end = round(min(t.end, total), 2)
+    edl.sfx = [s for s in edl.sfx if s.start < total - 0.05]
+    edl.overlays = [o for o in edl.overlays if o.start < total - 0.6]
+    overlay_errors(edl)   # trims a B-roll that now runs past the end
+    clamp_transitions(edl)
+    if edl.clips[0].transition_in is not None:
+        edl.clips[0].transition_in = None   # the new first clip has nothing to transition from
+    clamp_audio_trim(edl)
+    st["edl"] = edl.model_dump(by_alias=True, exclude_none=True)
+    return removed
 
 
 @app.get("/api/projects/{pid}/thumb/{name}")

@@ -17,7 +17,7 @@
 |---|---|
 | **What** | Local web app: FastAPI backend, single-file JS frontend, ffmpeg for rendering, Claude for the editing decisions. Windows. |
 | **My role** | Product idea, UX, the "AI decides, code executes" architecture, and all testing. Built in pair-programming with Claude — see [How it was built](#how-it-was-built). |
-| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). The edit-plan validation (the code that checks the AI's JSON before anything renders) has 27 automated tests in [`tests/test_edl.py`](tests/test_edl.py). The AI request loop has 16 more in [`tests/test_planner_loop.py`](tests/test_planner_loop.py): what happens when a reply is cut off, refused, plain text instead of a tool call, an invalid plan, or two tool calls at once, using a fake AI client, so no API call is made. And 6 in [`tests/test_api_key.py`](tests/test_api_key.py) check that the AI routes report a missing API key at once, without starting a job, and 11 in [`tests/test_projects.py`](tests/test_projects.py) cover project names and the output formats (in a temporary projects folder). All 60 run in CI on every push; rendering, audio and the UI are still tested by hand. |
+| **Quality** | Every stage tested by hand: the render pipeline, the AI planner, the server and UI. Harder features (overlays, audio timing, beat sync) were checked against purpose-built test clips with exact pixel/frequency checks, not just "it ran." A dedicated robustness pass found and fixed 4 real crash/data-loss bugs — details in [CLAUDE.md](CLAUDE.md#10-robustness-audit-fixes-applied). The edit-plan validation (the code that checks the AI's JSON before anything renders) has 27 automated tests in [`tests/test_edl.py`](tests/test_edl.py). The AI request loop has 16 more in [`tests/test_planner_loop.py`](tests/test_planner_loop.py): what happens when a reply is cut off, refused, plain text instead of a tool call, an invalid plan, or two tool calls at once, using a fake AI client, so no API call is made. And 8 in [`tests/test_api_key.py`](tests/test_api_key.py) check that the AI routes report a missing API key at once, without starting a job, and that the page is told whether a key is set (never the key itself), and 14 in [`tests/test_projects.py`](tests/test_projects.py) cover project names, the output formats and what removing a file does to the plan (in a temporary projects folder). All 65 run in CI on every push; rendering, audio and the UI are still tested by hand. |
 | **Status** | Personal/portfolio project, all planned features implemented. Two (Whisper subtitles, DaVinci import) are still untested on a normal install — see [Known limitations](#known-limitations-honest). |
 
 ## Why it exists
@@ -38,7 +38,10 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Full NLE-style toolkit: undo/redo, keyboard shortcuts, drag-trim, a split tool, per-clip speed (0.25×–4×, with ½× / 1× / 2× / 4× buttons), manual pan/reframe, a waveform display, multi-select.
 - A demo, a regenerate or a picked variant asks before it replaces your hand edits, and the previous plan stays one Undo away.
 - **Simple mode** by default on a first visit: the essentials (files, demos, the plan, per-clip edits, music, preview and export), with **All features** one click away in the header and every group still switchable in Settings.
-- Plan errors in plain words, with the clip numbers you see on screen (e.g. "The transition into clip 3 (0.3 s) is too long for clips this short…"), and a one-click fix for a transition that no longer fits.
+- Plan errors in plain words, with the clip numbers you see on screen (e.g. "The transition into clip 3 (0.3 s) is too long for clips this short…"), shown in a box at the bottom of the window as well as above the timeline, with a one-click fix for a transition that no longer fits or a clip cut under half a second.
+- While your last change can't be saved, Render, Quick preview and the FCPXML export stop and say so, instead of quietly using the last plan that did save.
+- **Apply to all clips** gives every clip the chosen colour look (warm, cool, contrast…) in one click, no AI needed; Undo takes it back.
+- Removing a file asks first and names the plan's clips that use it; those clips (and any B-roll from it) leave the plan with it, and the project's file count updates at once.
 - B-roll, picture-in-picture, and split-screen overlays.
 - J/L cuts — a clip's sound can start early or run past its picture, the way editors hide a hard cut.
 - Beat-synced zoom punches on the music.
@@ -56,8 +59,8 @@ Hand-editing a 30-second reel — picking the best moments, cutting to a beat, a
 - Export a finished MP4, or an FCPXML timeline that reopens your *original* files in DaVinci Resolve / Final Cut.
 - Three formats per project: vertical 9:16 (Reels, TikTok, Shorts), square 1:1 (feed posts) or horizontal 16:9 (YouTube); switching re-sizes the current plan, and new plans follow it.
 - Save the frame you paused on as a cover image (JPG, at the rendered video's size).
-- Projects have names ("Hike with Ana"), asked for when you create one and changeable with Rename.
-- Try 3 demo edits instantly, no API key needed. Without a key, the AI button says so at once, in plain words, and points to these demos.
+- Projects have names ("Hike with Ana"), asked for when you create one and changeable with Rename. A first visit starts in "My first project"; **+ New project** on a project that's still empty just renames it, so no empty ones pile up.
+- Try 3 demo edits instantly, no API key needed. Without a key, simple mode hides what only the AI uses (its style settings, Generate plan, the per-file notes for the AI) and says why; All features shows them, and the AI button then says at once, in plain words, that it isn't set up.
 
 Everything above is optional and toggleable — a Settings panel keeps the interface uncluttered, and a right-click menu on a clip mirrors the main actions.
 

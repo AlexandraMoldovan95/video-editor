@@ -80,3 +80,60 @@ def test_an_unknown_format_is_refused(client):
     r = client.put(f"/api/projects/{pid}/format", json={"format": "4:5"})
     assert r.status_code == 422
     assert client.get(f"/api/projects/{pid}").json()["format"] == "9:16"
+
+
+# ---------- removing a file ----------
+# The files themselves don't need to exist: removal deletes whatever is there and cleans the state.
+
+def write_state(tmp_path, pid, **fields):
+    state = tmp_path / pid / "state.json"
+    st = json.loads(state.read_text("utf-8"))
+    st.update(fields)
+    state.write_text(json.dumps(st), "utf-8")
+
+
+PLAN = {
+    "clips": [{"source": "a.jpg", "duration": 3.0},
+              {"source": "b.mp4", "in": 0.0, "out": 2.0, "transition_in": {"type": "fade", "duration": 0.4}},
+              {"source": "a.jpg", "duration": 3.0, "transition_in": {"type": "fade", "duration": 0.4}},
+              {"source": "c.jpg", "duration": 3.0, "transition_in": {"type": "dissolve", "duration": 1.0}}],
+    "overlays": [{"source": "b.mp4", "in": 0.0, "out": 1.0, "start": 0.5},
+                 {"source": "a.jpg", "duration": 1.0, "start": 1.0}],
+    "texts": [{"content": "Hello", "start": 0.0, "end": 2.0}, {"content": "Late", "start": 8.0, "end": 10.0}],
+    "sfx": [{"name": "ding", "start": 1.0}, {"name": "pop", "start": 7.0}],
+}
+
+
+def test_removing_a_file_takes_its_clips_out_of_the_plan(client, tmp_path):
+    pid = new_project(client)
+    write_state(tmp_path, pid, edl=PLAN, is_demo="calm_vlog",
+                lock_rules=[{"type": "source", "source": "a.jpg"}, {"type": "opening_seconds", "seconds": 2}])
+    r = client.delete(f"/api/projects/{pid}/media/a.jpg").json()
+    assert r == {"deleted": "a.jpg", "removed_clips": [1, 3]}   # numbered as on screen, from 1
+    st = client.get(f"/api/projects/{pid}").json()
+    edl = st["edl"]
+    assert [c["source"] for c in edl["clips"]] == ["b.mp4", "c.jpg"]
+    assert "transition_in" not in edl["clips"][0]                 # the new first clip has nothing before it
+    assert edl["clips"][1]["transition_in"]["duration"] == 0.8     # 40% of the shorter clip (2 s)
+    assert [o["source"] for o in edl["overlays"]] == ["b.mp4"]
+    # the video is now 5 s long: what started after its end goes, the rest stays
+    assert [t["content"] for t in edl["texts"]] == ["Hello"]
+    assert [s["name"] for s in edl["sfx"]] == ["ding"]
+    assert st["lock_rules"] == [{"type": "opening_seconds", "seconds": 2}]
+    assert st["is_demo"] is None
+
+
+def test_removing_the_only_file_in_the_plan_leaves_no_plan(client, tmp_path):
+    pid = new_project(client)
+    write_state(tmp_path, pid, edl={"clips": [{"source": "a.jpg", "duration": 3.0}]})
+    assert client.delete(f"/api/projects/{pid}/media/a.jpg").json()["removed_clips"] == [1]
+    assert client.get(f"/api/projects/{pid}").json()["edl"] is None
+
+
+def test_removing_a_file_the_plan_doesnt_use_keeps_the_plan(client, tmp_path):
+    pid = new_project(client)
+    write_state(tmp_path, pid, edl=PLAN, is_demo="calm_vlog")
+    before = client.get(f"/api/projects/{pid}").json()["edl"]
+    assert client.delete(f"/api/projects/{pid}/media/zzz.mp4").json()["removed_clips"] == []
+    st = client.get(f"/api/projects/{pid}").json()
+    assert st["edl"] == before and st["is_demo"] == "calm_vlog"

@@ -6,6 +6,8 @@ set in) the environment for each test only.
 
 Run from the repo root:  python -m pytest -q
 """
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -47,3 +49,17 @@ def test_ai_routes_answer_at_once_without_a_key(no_dotenv, monkeypatch, path):
     assert r.status_code == 503
     assert r.json()["detail"] == planner.MISSING_KEY
     assert started == []
+
+
+@pytest.mark.parametrize("key, ready", [(None, False), ("test-not-a-real-key", True)])
+def test_config_says_whether_the_ai_is_ready(no_dotenv, monkeypatch, key, ready):
+    """The page hides the AI-only controls in simple mode when this is false; the key itself
+    never leaves the server."""
+    if key is None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", key)
+    from app import main
+    cfg = TestClient(main.app).get("/api/config").json()
+    assert cfg["ai_ready"] is ready
+    assert "test-not-a-real-key" not in json.dumps(cfg)

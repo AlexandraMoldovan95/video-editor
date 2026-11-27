@@ -68,6 +68,17 @@ button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 /* a plan error gets its own line under the timeline header (it used to run into the shortcuts text) */
 #edlMsg.edlErr{flex-basis:100%;white-space:pre-line;font-size:12.5px;line-height:1.45;margin-bottom:10px}
+/* the same error pinned to the bottom of the window: the Timeline header it also shows in is often
+   far above the clip being edited (a usability test missed it there) */
+.edlToast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;width:min(560px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--err);border-radius:var(--r);padding:10px 14px;box-shadow:0 8px 24px #0009;font-size:13px;line-height:1.45}
+.edlToast[hidden]{display:none}
+.edlToastTitle{display:block;color:var(--err);margin-bottom:2px}
+#edlToastMsg{white-space:pre-line}
+.edlToastBtns{justify-content:flex-end;margin-top:8px}
+/* no API key, in simple mode: what only the AI uses is hidden, and a note says why */
+.noAiOnly{display:none}
+body.noAi .noAiOnly{display:block}
+body.noAi .aiOnly{display:none !important}
 .tl{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:4px 0 10px}
 .tl div{display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border-right:1px solid #0006;cursor:grab;min-width:6px;background-size:cover;background-position:center;position:relative;touch-action:none}
 .tl div.dragging{opacity:.5;cursor:grabbing;z-index:4;outline:2px dashed var(--acc);outline-offset:-2px}
@@ -220,6 +231,7 @@ button.ghost{background:transparent;border-color:var(--line)}
       <div class="drop" id="drop">Drag videos and photos here<br><small>or click to choose</small></div>
       <input type="file" id="fileIn" multiple accept="video/*,image/*" hidden>
       <div class="grid" id="grid"></div>
+      <div class="status" id="fileStatus" hidden></div>
 
       <div class="panel" id="hintPanel" hidden></div>
 
@@ -272,7 +284,8 @@ button.ghost{background:transparent;border-color:var(--line)}
         <div class="row" id="demoBtns"></div>
       </div>
       <div class="panel">
-        <div class="row" style="margin-bottom:6px">
+        <div class="hint noAiOnly" id="noAiNote" style="margin-bottom:8px">The AI planner isn't set up on this computer (no Anthropic API key), so its settings are hidden here. You can still start from a ready-made example under <b>Try a demo</b> (it needs the sample clips listed in the README), change anything in it by hand, give every clip a colour look below, and render. To let the AI plan your own clips, add a key (README, Getting started). <b>All features</b> in the header shows everything.</div>
+        <div class="row aiOnly" style="margin-bottom:6px">
           <label class="hint">Preset</label>
           <select id="preset"></select>
           <span class="hint">fields you change take priority</span>
@@ -290,16 +303,17 @@ button.ghost{background:transparent;border-color:var(--line)}
               <button type="button" class="small ghost durQ" data-s="60" style="padding:2px 6px">60</button>
             </span>
           </div>
-          <div class="field"><label>Pace</label><select id="f_pace"><option>slow</option><option>medium</option><option>fast</option></select></div>
-          <div class="field"><label>Color look</label><select id="f_color_look"><option>neutral</option><option>warm</option><option>cool</option><option>contrast</option><option>pastel</option></select></div>
-          <div class="field"><label>Vertical fit</label><select id="f_vertical_fit"><option value="crop_center">center crop</option><option value="blur_pad">blurred background</option></select></div>
-          <div class="field"><label>Photos</label><select id="f_photo_motion"><option value="zoom_in">zoom in</option><option value="zoom_out">zoom out</option><option value="static">static</option></select></div>
-          <div class="field"><label>Transitions</label><select id="f_transition_style"><option value="cuts">cuts only</option><option value="subtle">subtle</option><option value="dynamic">dynamic</option></select></div>
-          <div class="field"><label>Text</label><select id="f_text_style"><option value="none">none</option><option value="title_only">title only</option><option value="story">story</option></select></div>
+          <div class="field aiOnly"><label>Pace</label><select id="f_pace"><option>slow</option><option>medium</option><option>fast</option></select></div>
+          <div class="field"><label>Color look</label><select id="f_color_look"><option>neutral</option><option>warm</option><option>cool</option><option>contrast</option><option>pastel</option></select>
+            <button type="button" class="small ghost" id="applyLookBtn" title="Give every clip in your current plan this look now (Undo brings the old colours back)" disabled>Apply to all clips</button></div>
+          <div class="field aiOnly"><label>Vertical fit</label><select id="f_vertical_fit"><option value="crop_center">center crop</option><option value="blur_pad">blurred background</option></select></div>
+          <div class="field aiOnly"><label>Photos</label><select id="f_photo_motion"><option value="zoom_in">zoom in</option><option value="zoom_out">zoom out</option><option value="static">static</option></select></div>
+          <div class="field aiOnly"><label>Transitions</label><select id="f_transition_style"><option value="cuts">cuts only</option><option value="subtle">subtle</option><option value="dynamic">dynamic</option></select></div>
+          <div class="field aiOnly"><label>Text</label><select id="f_text_style"><option value="none">none</option><option value="title_only">title only</option><option value="story">story</option></select></div>
         </div>
-        <div class="hint" style="margin:2px 0 6px">These choices shape the <b>next plan the AI makes</b> (Generate / Regenerate); a plan you already have stays as it is. To change one clip now: <b>Edit</b> on the clip, then <b>Show advanced</b> for its colour.</div>
-        <textarea id="f_notes" placeholder="Instructions for the AI (e.g. start with the waterfall, calm ending)"></textarea>
-        <div class="row" style="margin-top:8px">
+        <div class="hint" style="margin:2px 0 6px"><span class="aiOnly">These choices shape the <b>next plan the AI makes</b> (Generate / Regenerate); a plan you already have stays as it is. </span><b>Apply to all clips</b> gives every clip in your current plan the colour look now. To change one clip: <b>Edit</b> on the clip, then <b>Show advanced</b> for its colour.</div>
+        <textarea id="f_notes" class="aiOnly" placeholder="Instructions for the AI (e.g. start with the waterfall, calm ending)"></textarea>
+        <div class="row aiOnly" style="margin-top:8px">
           <button class="primary" id="planBtn">Generate plan</button>
           <span class="hint" id="planHint"></span>
           <button class="small ghost" id="variantsBtn" title="Generate 2-3 structurally different drafts in one pass and pick your favorite">🎲 3 variants</button>
@@ -379,6 +393,13 @@ button.ghost{background:transparent;border-color:var(--line)}
       </div>
     </div>
   </section>
+</div>
+
+<!-- the plan's save error, also shown at the bottom of the window (see showEdlMsg) -->
+<div id="edlToast" class="edlToast" role="alert" hidden>
+  <b class="edlToastTitle">Your last change isn't saved</b>
+  <div id="edlToastMsg"></div>
+  <div class="row edlToastBtns"><span id="edlToastFix"></span><button type="button" class="small" id="edlToastUndo">↶ Undo it</button><button type="button" class="small ghost" id="edlToastClose">Close</button></div>
 </div>
 
 <script>
@@ -474,8 +495,14 @@ function applyFeatureVisibility() {
   if ($('#demoPanel')) $('#demoPanel').hidden = !FEATURES.demo || !DEMOS.length;
   // panels whose own render function already decides `hidden` from other state (audio clips
   // present, etc.) - just re-run them so the feature flag gets folded into that same check
+  applyAiVisibility();   // before the re-renders below: the empty plan's text depends on it
   if (P) { renderTranscripts(); renderDemoBtns(); renderPlan(); renderHint(); renderLockRules(); renderOverlays(); }
   renderModeSwitch();
+}
+// Simple mode on a computer with no API key: what only the AI uses (class aiOnly) is hidden and a
+// note says why (noAiOnly). All features, or your own mix in Settings, shows everything as before.
+function applyAiVisibility() {
+  document.body.classList.toggle('noAi', !!CFG && CFG.ai_ready === false && featureMode() === 'simple');
 }
 $('#settingsBtn').onclick = () => { renderSettingsModal(); $('#settingsModal').hidden = false };
 $('#modeSimple').onclick = () => setFeatureMode(SIMPLE_FEATURES);
@@ -545,17 +572,19 @@ function keepUndoAfterReplace(before) {
   if (before) { EDL_HISTORY.push(before); if (EDL_HISTORY.length > 200) EDL_HISTORY.shift() }
   PLAN_EDITED = false;
 }
+// is_demo is cleared here, not only once the save comes back: the "Pre-built example" line stayed
+// over a plan that Undo had already changed
 function undo() {
   if (!EDL_HISTORY.length) return;
   EDL_FUTURE.push(JSON.stringify(P.edl));
   P.edl = JSON.parse(EDL_HISTORY.pop());
-  selClip = null; renderPlan(); saveEdl();
+  P.is_demo = null; selClip = null; renderPlan(); saveEdl();
 }
 function redo() {
   if (!EDL_FUTURE.length) return;
   EDL_HISTORY.push(JSON.stringify(P.edl));
   P.edl = JSON.parse(EDL_FUTURE.pop());
-  selClip = null; renderPlan(); saveEdl();
+  P.is_demo = null; selClip = null; renderPlan(); saveEdl();
 }
 const PRESET_FIELDS = ['target_duration', 'pace', 'color_look', 'vertical_fit', 'photo_motion', 'transition_style', 'text_style'];
 const TR_TYPES = ['fade', 'dissolve', 'fadeblack', 'fadewhite', 'wipeleft', 'slideleft', 'slideup', 'smoothleft', 'circleopen', 'circleclose'];
@@ -565,6 +594,7 @@ const thumb = n => `/api/projects/${P.id}/thumb/${encodeURIComponent(n)}`;
 const mediaOf = n => P.media.find(m => m.name === n);
 
 // ---------------- projects ----------------
+const FIRST_PROJECT = 'My first project';
 async function init() {
   // was 4 of applyFeatureVisibility()'s lines duplicated here, by themselves - which also meant every
   // OTHER toggle (lock rules, overlays, quick preview, variants...) stayed visible on a fresh page
@@ -572,11 +602,17 @@ async function init() {
   // call here covers all of them consistently.
   applyFeatureVisibility();
   CFG = await api('/api/config');
+  applyAiVisibility();   // needs CFG.ai_ready
   renderPresetOptions();
   try { DEMOS = await api('/api/demo') } catch { DEMOS = [] }
   $('#demoPanel').hidden = !FEATURES.demo || !DEMOS.length;
   let list = await api('/api/projects');
-  if (!list.length) { await api('/api/projects', {method: 'POST'}); list = await api('/api/projects') }
+  if (!list.length) {
+    // the very first visit: a named project instead of "Project 556ea945" left over in the list
+    const r = await api('/api/projects', {method: 'POST'});
+    await api(`/api/projects/${r.id}/name`, jsonOpt('PUT', {name: FIRST_PROJECT}));
+    list = await api('/api/projects');
+  }
   fillProjects(list);
   await loadProject(localStorageGet('proj') && list.find(p => p.id === localStorageGet('proj')) ? localStorageGet('proj') : list[0].id);
 }
@@ -598,13 +634,22 @@ async function loadProject(id) {
   localStorageSet('proj', id);
   $('#projSel').value = id;
   selFile = null; selClip = null; clearHistory(); WAVEFORMS = {}; FILMSTRIPS = {};
+  FAILED_PLAN = null; $('#edlToast').hidden = true; $('#fileStatus').hidden = true;
   renderSettings(); renderGrid(); renderHint(); renderTranscripts(); renderExample(); renderMusic(); renderAmbience(); renderLockRules(); renderOverlays(); renderPlan(); renderDemoBtns();
-  $('#player').removeAttribute('src'); $('#dl').hidden = true; $('#dlHint').hidden = true; $('#coverRow').hidden = true;
+  clearRenderedVideo();
   renderFormat();
+}
+function clearRenderedVideo() {
+  const pl = $('#player'); pl.removeAttribute('src'); pl.load();   // load() clears the last frame still on screen
+  $('#dl').hidden = true; $('#dlHint').hidden = true; $('#coverRow').hidden = true;
 }
 async function refresh() { P = await api(`/api/projects/${P.id}`); }
 $('#projSel').onchange = e => loadProject(e.target.value);
 $('#newProj').onclick = async () => {
+  // the empty project a first visit makes (or any untouched, unnamed one) gets the new name
+  // instead of staying behind, empty, in the list
+  const untouched = P && !P.media.length && !P.edl && !P.music && !P.ambience && !P.example;
+  if (untouched && (!P.name || P.name === FIRST_PROJECT)) return nameProject(P.id, '');
   const r = await api('/api/projects', {method: 'POST'});
   fillProjects(await api('/api/projects')); await loadProject(r.id);
   await nameProject(r.id, '');   // optional: Cancel leaves it unnamed
@@ -683,8 +728,10 @@ function renderHint() {
   panel.hidden = false;
   panel.innerHTML = `
     <h3>File settings <span class="hint">— ${esc(m.name)}</span></h3>
-    <div class="hint" style="margin-bottom:6px">What you fix here is applied exactly; the AI takes it into account and harmonizes the rest.</div>
+    <div class="hint aiOnly" style="margin-bottom:6px">What you fix here is applied exactly; the AI takes it into account and harmonizes the rest.</div>
+    <div class="hint noAiOnly" style="margin-bottom:6px">This file's settings guide the AI planner, which isn't set up on this computer, so only the preview and Remove are shown.</div>
     ${m.kind === 'video' ? `<video id="hv" src="${src}" controls muted preload="metadata"></video>` : `<img src="${thumb(m.name)}" style="width:100%;border-radius:6px">`}
+    <div class="aiOnly">
     <div class="field"><label>Usage</label>${segBtns('use', [['auto', 'auto'], ['must', 'required'], ['exclude', 'excluded']])}</div>
     ${m.kind === 'video' ? `
       <div class="field"><label>Allowed range (s)</label>
@@ -708,7 +755,8 @@ function renderHint() {
       }).join('')}</div>
     </div>` : ''}
     <div class="field" style="align-items:flex-start"><label>Note for AI</label><textarea id="h_note" placeholder="e.g. the good moment is the jump at the end">${esc(h.note)}</textarea></div>
-    <div class="row"><button class="small" id="h_reset">Reset</button><button class="small" id="h_del" style="color:var(--err)">Remove file</button><span class="hint" id="h_saved"></span></div>`;
+    </div>
+    <div class="row"><button class="small aiOnly" id="h_reset">Reset</button><button class="small" id="h_del" style="color:var(--err)">Remove file</button><span class="hint" id="h_saved"></span></div>`;
 
   const save = debounce(async () => {
     const color = $('#h_cl')?.checked ? Object.fromEntries([...panel.querySelectorAll('[data-ck]')].map(i => [i.dataset.ck, +i.value])) : null;
@@ -744,7 +792,32 @@ function renderHint() {
     $('#clrSeg').onclick = () => { $('#h_in').value = ''; $('#h_out').value = ''; save() };
   }
   $('#h_reset').onclick = async () => { await api(`/api/projects/${P.id}/hints/${encodeURIComponent(selFile)}`, jsonOpt('PUT', DEFAULT_HINT)); delete P.hints[selFile]; renderGrid(); renderHint() };
-  $('#h_del').onclick = async () => { await api(`/api/projects/${P.id}/media/${encodeURIComponent(selFile)}`, {method: 'DELETE'}); selFile = null; await refresh(); renderGrid(); renderHint(); renderDemoBtns(); renderLockRules(); renderOverlays() };
+  $('#h_del').onclick = () => removeFile(selFile);
+}
+// Removing a file used to happen at once, with no question, and left its clips in the plan, so the
+// next edit failed to save. Now it asks first, says which clips go with it, and the server takes
+// them out of the plan; the file count in the project list updates straight away.
+async function removeFile(name) {
+  await saveEdl.flush(); await SAVE_CHAIN.catch(() => {});   // the server cleans the plan it has: send the latest first
+  const used = P.edl ? P.edl.clips.map((c, i) => c.source === name ? i + 1 : 0).filter(Boolean) : [];
+  const broll = P.edl ? (P.edl.overlays || []).filter(o => o.source === name).length : 0;
+  const list = ns => ns.length > 1 ? `${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}` : `${ns[0]}`;
+  const parts = [];
+  if (used.length) parts.push(used.length === P.edl.clips.length ? 'every clip in your plan uses it, so the plan goes too'
+    : `it's in your plan as clip${used.length > 1 ? 's' : ''} ${list(used)}; ${used.length > 1 ? 'those clips go' : 'that clip goes'} too`);
+  if (broll) parts.push(`it's used as B-roll ${broll > 1 ? `${broll} times` : 'once'}; that goes too`);
+  const msg = `Remove "${name}" from this project?\n\n${parts.length ? parts.join('. ') + '.\n\n' : ''}`
+    + `Your original file on your computer isn't touched.${parts.length ? " This can't be undone." : ''}`;
+  if (!confirm(msg)) return;
+  const r = await api(`/api/projects/${P.id}/media/${encodeURIComponent(name)}`, {method: 'DELETE'});
+  selFile = null;
+  await refresh();
+  // undo would bring back clips of a file that's no longer here, and that plan can't be saved
+  if (r.removed_clips && r.removed_clips.length) { clearHistory(); selClip = null }
+  renderGrid(); renderHint(); renderTranscripts(); renderDemoBtns(); renderLockRules(); renderPlan();
+  fillProjects(await api('/api/projects')); $('#projSel').value = P.id;
+  const n = (r.removed_clips || []).length;
+  alertStatus('#fileStatus', `Removed "${name}"${n ? ` and ${n} clip${n > 1 ? 's' : ''} that used it` : ''}.`, false, true);
 }
 
 // ---------------- transcription (Whisper) ----------------
@@ -1056,6 +1129,19 @@ const saveSettings = debounce(async () => {
   await api(`/api/projects/${P.id}/settings`, jsonOpt('PUT', {preset, overrides}));
 }, 300);
 $('#preset').onchange = () => { P.preset = $('#preset').value; P.overrides = {}; renderSettings(); saveSettings(); renderMusic(); renderPlan() };
+// A colour look without the AI: the base values the AI itself starts from for that look
+// (COLOR_BASE in app/presets.py) go on every clip of the current plan, as one step Undo takes back.
+// Locks stay as they are: a lock keeps the AI's hands off a clip, this is your own edit.
+$('#applyLookBtn').onclick = () => {
+  const look = $('#f_color_look').value, base = (CFG.color_base || {})[look];
+  if (!P.edl || !base) return;
+  snapshotEdl();
+  P.edl.clips.forEach(c => Object.assign(c, base));
+  // said where "✓ saved" goes, which the next change of the plan replaces (a status line here
+  // kept saying it after an Undo had taken the look away again)
+  SAVED_NOTE = `✓ All ${P.edl.clips.length} clips now have the "${look}" look. Undo brings the old colours back.`;
+  saveEdl(); renderPlan();
+};
 PRESET_FIELDS.concat('notes').forEach(k => $('#f_' + k).addEventListener('input', saveSettings));
 $('#f_target_duration').addEventListener('input', () => { renderMusic(); renderPlan() });
 document.querySelectorAll('.durQ').forEach(b => b.onclick = () => {
@@ -1304,8 +1390,15 @@ function renderPlan() {
   // overlays live in the plan too: a demo, a regenerate, a picked variant or an undo replaces
   // them, and the B-roll panel used to keep showing the old ones (and an empty file picker)
   renderOverlays();
+  $('#applyLookBtn').disabled = !P.edl;
+  if (!planSaveFailed()) $('#edlToast').hidden = true;   // the plan on screen changed since the refused save
   $('#usage').textContent = P.usage ? `last plan: ${P.usage.input_tokens} tok in / ${P.usage.output_tokens} out` : '';
-  if (!P.edl) { area.innerHTML = `<div class="empty">Upload your material, choose a preset, and click "Generate plan"${DEMOS.length ? ' — or try one of the demo buttons above' : ''}.</div>`; return }
+  if (!P.edl) {
+    area.innerHTML = document.body.classList.contains('noAi')
+      ? '<div class="empty">Upload the sample clips, then pick one of the demos above: it gives you a plan to edit, colour and render.</div>'
+      : `<div class="empty">Upload your material, choose a preset, and click "Generate plan"${DEMOS.length ? ' — or try one of the demo buttons above' : ''}.</div>`;
+    return;
+  }
   ensureWaveforms();
   ensureFilmstrips();
   const clips = P.edl.clips, total = clips.reduce((s, c) => s + clipDur(c), 0);
@@ -1555,16 +1648,31 @@ function clipRow(c, i) {
 // actual PUT through one at a time, in the order they were sent, so an older write can never land
 // after a newer one - this is what actually fixes the race, not the debounce above it.
 let SAVE_CHAIN = Promise.resolve();
+// The plan the server last refused, as JSON. Render and Preview use the SAVED plan, so while the plan
+// on screen is still that refused one they'd quietly leave the latest change out: they stop and say so.
+let FAILED_PLAN = null;
+let SAVED_NOTE = null;   // shown once instead of "✓ saved" after the next successful save
+const planSaveFailed = () => !!(FAILED_PLAN && P.edl && JSON.stringify(P.edl) === FAILED_PLAN);
+async function planIsSaved(statusSel) {
+  await saveEdl.flush(); await SAVE_CHAIN.catch(() => {});   // the pending save, then any still on its way
+  if (!planSaveFailed()) return true;
+  alertStatus(statusSel, "Your last change to the plan isn't saved, so the video would leave it out. "
+    + 'Fix the problem in the box at the bottom of the window (or Undo the change), then try again.', true);
+  $('#edlToast').hidden = false;
+  return false;
+}
 const saveEdl = debounce(async () => {
   const payload = P.edl;   // snapshot now - this call's truth, whatever happens while it waits its turn
   const thisSave = SAVE_CHAIN = SAVE_CHAIN.catch(() => {}).then(async () => {
-    await api(`/api/projects/${P.id}/edl`, jsonOpt('PUT', payload));
+    try { await api(`/api/projects/${P.id}/edl`, jsonOpt('PUT', payload)) }
+    catch (e) { FAILED_PLAN = JSON.stringify(payload); throw e }
+    FAILED_PLAN = null;
     P.is_demo = null;   // a manual edit means this is no longer the untouched demo/AI plan
     if (Object.keys(P.transcripts || {}).length) { const np = await api(`/api/projects/${P.id}`); P.subtitles_preview = np.subtitles_preview; const tr = document.querySelector('.trk'); if (tr) tr.outerHTML = textTrack(P.edl.clips.reduce((s, c) => s + clipDur(c), 0)) }
   });
   try {
     await thisSave;
-    showEdlMsg('✓ saved', false);
+    showEdlMsg(SAVED_NOTE || '✓ saved', false); SAVED_NOTE = null;
     if (FEATURES.quickPreview && $('#autoPreviewChk')?.checked) triggerPreview();
   }
   catch (e) { showEdlMsg(e.message, true) }
@@ -1677,17 +1785,37 @@ function bindClips(area) {
   });
 }
 // ---------------- split ----------------
+// A plan error shows twice: in the Timeline header and in a box pinned to the bottom of the window,
+// next to whatever is being edited. Both offer the fix when the app can make it; the box goes away
+// once the plan saves.
 function showEdlMsg(msg, isErr) {
-  const el = $('#edlMsg'); if (!el) return;
-  el.classList.toggle('edlErr', !!isErr);
-  el.textContent = isErr ? friendlyEdlError(msg) : msg;
-  el.style.color = isErr ? 'var(--err)' : 'var(--ok)';
-  if (isErr && /transition is too long/.test(msg || '')) {
-    const b = document.createElement('button');
-    b.className = 'small'; b.textContent = 'Shorten the transition for me';
-    b.onclick = fixTooLongTransitions;
-    el.append(' ', b);
+  const el = $('#edlMsg'), toast = $('#edlToast');
+  const fixLabel = isErr ? planFixLabel(msg) : null;
+  const fixBtn = () => { const b = document.createElement('button'); b.type = 'button'; b.className = 'small'; b.textContent = fixLabel; b.onclick = fixPlanForMe; return b };
+  if (el) {
+    el.classList.toggle('edlErr', !!isErr);
+    el.textContent = isErr ? friendlyEdlError(msg) : msg;
+    el.style.color = isErr ? 'var(--err)' : 'var(--ok)';
+    if (fixLabel) el.append(' ', fixBtn());
   }
+  if (!isErr) { toast.hidden = true; return }
+  $('#edlToastMsg').textContent = friendlyEdlError(msg);
+  $('#edlToastFix').replaceChildren(...(fixLabel ? [fixBtn()] : []));
+  $('#edlToastUndo').disabled = !EDL_HISTORY.length;
+  toast.hidden = false;
+}
+$('#edlToastClose').onclick = () => { $('#edlToast').hidden = true };
+$('#edlToastUndo').onclick = () => undo();
+// The two errors the app can fix by itself: a clip under half a second, a transition too long for its clips.
+function planFixLabel(msg) {
+  const short = /cut too short/.test(msg || ''), tr = /transition is too long/.test(msg || '');
+  return short && tr ? 'Fix these for me' : short ? 'Lengthen the clip for me' : tr ? 'Shorten the transition for me' : null;
+}
+function fixPlanForMe() {
+  snapshotEdl();
+  lengthenTooShortClips();
+  shortenTooLongTransitions();   // after, since a longer clip can make room for its transition
+  saveEdl(); renderPlan();
 }
 // The server's plan errors are written for the AI, which reads them to correct its own plans: they
 // count clips from 0, as in the plan's JSON ("clip 2" is the third clip). The person editing gets a
@@ -1719,11 +1847,20 @@ function friendlyEdlError(msg) {
   });
   return lines.length > 1 ? `This edit can't be used yet:\n• ${lines.join('\n• ')}` : `This edit can't be used yet: ${lines[0]}`;
 }
+// The server keeps at least 0.5 s of a video clip; this makes such a clip 0.6 s, longer at the end
+// if the video has room there, otherwise earlier at the start.
+function lengthenTooShortClips() {
+  for (const c of P.edl.clips) {
+    if (c.in == null || c.out == null || c.out - c.in >= 0.5) continue;
+    const dur = (mediaOf(c.source) || {}).duration; if (!dur) continue;
+    c.out = Math.round(Math.min(dur, c.in + 0.6) * 100) / 100;
+    if (c.out - c.in < 0.5) c.in = Math.round(Math.max(0, c.out - 0.6) * 100) / 100;
+  }
+}
 // The "Shorten the transition for me" fix: the same rule as the server (a transition is at most 40%
 // of the shorter of the two clips it joins); one too short even for 0.15 s becomes a direct cut.
-function fixTooLongTransitions() {
+function shortenTooLongTransitions() {
   const clips = P.edl.clips;
-  snapshotEdl();
   for (let i = 1; i < clips.length; i++) {
     const tr = clips[i].transition_in; if (!tr) continue;
     const lim = 0.4 * Math.min(clipDur(clips[i - 1]), clipDur(clips[i]));
@@ -1732,7 +1869,6 @@ function fixTooLongTransitions() {
       else clips[i].transition_in = null;
     }
   }
-  saveEdl(); renderPlan();
 }
 // Which clip (and offset into it) sits at timeline time t, in the same "final video seconds"
 // convention already used for text start/end and the beat ticks (i.e. it does not subtract
@@ -2036,6 +2172,7 @@ $('#formatSel').onchange = async e => {
     await saveEdl.flush();   // the server re-sizes the saved plan: hand edits must be saved first
     const r = await api(`/api/projects/${P.id}/format`, jsonOpt('PUT', {format}));
     P.format = r.format; P.edl = r.edl;
+    clearRenderedVideo();   // the old draft, its download and cover were the old shape
     renderFormat(); renderPlan();
     alertStatus('#renderStatus', 'Format changed. Render again to see the new shape.', false, true);
   } catch (err) { alertStatus('#renderStatus', err.message, true); renderFormat() }
@@ -2072,7 +2209,7 @@ async function doRender(final) {
   $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = true;
   $('#renderStatus').className = 'status';
   try {
-    await saveEdl.flush();
+    if (!(await planIsSaved('#renderStatus'))) return;   // it says why; `finally` turns the buttons back on
     const mute = !!P.music && $('#muteChk').checked;
     const {job} = await api(`/api/projects/${P.id}/render?final=${final}&mute=${mute}`, {method: 'POST'});
     const r = await waitJob(job, '#renderStatus', final ? 'Rendering final' : 'Rendering draft');
@@ -2084,11 +2221,11 @@ async function doRender(final) {
       + 'To get it on your phone: send the file to yourself (email, WhatsApp, Google Drive or iCloud) or copy it over a USB cable.';
     alertStatus('#renderStatus', `Done in ${r.seconds}s`, false, true);
   } catch (e) { alertStatus('#renderStatus', friendlyEdlError(e.message), true) }
-  $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = false;
+  finally { $('#draftBtn').disabled = $('#finalBtn').disabled = $('#planBtn').disabled = false }
 }
 $('#fcpBtn').onclick = async () => {
   if (!P.edl) return alertStatus('#renderStatus', 'Generate a plan first', true);
-  await saveEdl.flush();
+  if (!(await planIsSaved('#renderStatus'))) return;   // the export is made from the saved plan too
   const a = document.createElement('a'); a.href = `/api/projects/${P.id}/export/fcpxml`; a.download = ''; a.click();
 };
 $('#draftBtn').onclick = () => doRender(false);
@@ -2108,14 +2245,16 @@ const triggerPreview = debounce(async () => {
   PREVIEW_INFLIGHT = true;
   if ($('#previewBtn')) $('#previewBtn').disabled = true;
   try {
-    await saveEdl.flush();
+    if (!(await planIsSaved('#previewStatus'))) return;   // it says why; `finally` turns the button back on
     const {job} = await api(`/api/projects/${P.id}/preview`, {method: 'POST'});
     const r = await waitJob(job, '#previewStatus', 'Quick preview');
     $('#player').src = r.url; $('#player').play().catch(() => {});
     alertStatus('#previewStatus', `Preview ready in ${r.seconds}s`, false, true);
   } catch (e) { alertStatus('#previewStatus', friendlyEdlError(e.message), true) }
-  PREVIEW_INFLIGHT = false;
-  if ($('#previewBtn')) $('#previewBtn').disabled = false;
+  finally {
+    PREVIEW_INFLIGHT = false;
+    if ($('#previewBtn')) $('#previewBtn').disabled = false;
+  }
 }, 900);
 $('#previewBtn').onclick = () => { if (!P.edl) return alertStatus('#previewStatus', 'Generate a plan first', true); triggerPreview() };
 
