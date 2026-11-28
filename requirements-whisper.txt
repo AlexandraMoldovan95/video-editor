@@ -1,1 +1,4 @@
 faster-whisper>=1.1
+# faster-whisper 1.2.1 opens audio with av.open(..., metadata_errors=...), which PyAV 19 no longer
+# accepts: every transcription failed on a fresh install (TypeError). 18.1.1 works (tested 2026-11-28).
+av<19

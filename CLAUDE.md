@@ -53,7 +53,7 @@ Every field is a Pydantic model with hard-coded safe ranges (`ge`/`le`), and `so
 - **AI**: the official `anthropic` SDK, model `claude-sonnet-5-5`, key read from `.env` (`ANTHROPIC_API_KEY`) via `python-dotenv`.
 - **EDL validation**: Pydantic models (safe value ranges, files restricted to the current project's folder, `in < out`, durations within the clip's own length).
 - **Frontend**: a single-page HTML/CSS/JS file served by FastAPI — upload, presets, per-file settings, timeline, preview `<video>`, render buttons.
-- **Dependencies**: `requirements.txt` (fastapi, uvicorn, python-multipart, anthropic, python-dotenv, pydantic); `requirements-whisper.txt` is optional, for subtitles.
+- **Dependencies**: `requirements.txt` (fastapi, uvicorn, python-multipart, anthropic, python-dotenv, pydantic); `requirements-whisper.txt` is optional, for subtitles (faster-whisper, and PyAV kept below 19; see §9).
 
 ### Project layout
 
@@ -148,6 +148,8 @@ Kept away from the real export on purpose: `render()` (draft/final) never receiv
 ## 9. Subtitles and DaVinci export
 
 - Whisper transcription (`faster-whisper`, optional) is cached per file; **subtitles are never stored** — `subtitles.py` recomputes their timing from the transcript and the *current* cut list on every render, so editing the timeline can never desync a caption.
+- `requirements-whisper.txt` pins `av<19`: faster-whisper 1.2.1 calls `av.open(..., metadata_errors=...)`, which PyAV 19 removed, so a fresh install failed every transcription with a `TypeError` (found 2026-11-28, the first run on a normal install; 18.1.1 works). Re-check when faster-whisper releases a version past 1.2.1.
+- Tested end to end on Windows on 2026-11-28 (isolated copy, no API key, headless Edge, real clicks): a clip with four sentences read by the Windows voice at known times, a plan cutting sentence 3 out → 31/31 words, no words from the cut part, sentence 4 moved to 6.4 + (10.34 − 10.2) = 6.54 s, burned into the draft, present in the FCPXML. Whisper puts a sentence's first word up to ~0.4 s early. Real voices, noise and Romanian are untested.
 - The AI receives the transcript with timestamps and is told not to cut mid-sentence.
 - FCPXML export (`fcpxml.py`) builds a DaVinci Resolve / Final Cut timeline that references the *original* source files, validated against OpenTimelineIO for frame-accurate timing. It does not carry over per-clip speed changes, manual pan/reframe, freely-positioned text, overlays, or beat punches — those are specific to this project's own renderer.
 
