@@ -185,14 +185,22 @@
   .prose strong{color:var(--text);}
 
   footer{border-top:1px solid var(--line);padding:22px 0;margin-top:0;}
-  /* The footer, centred: the name, and under it a way back up, so a reader at the end of a long
-     page doesn't scroll all the way up by hand. #top is <body>, not the sticky top bar: a link to a
-     sticky element doesn't scroll, because the browser sees it as already on screen. */
-  .footer-inner{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;}
+  /* The footer: the name, centred. */
+  .footer-inner{text-align:center;}
   .footer-name{color:var(--muted);font-size:13px;}
-  .to-top{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:13.5px;}
-  .to-top:hover{text-decoration:none;border-color:var(--muted);}
-  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto !important;}}
+  /* "Back to top": a round button in the bottom-right corner, by the scrollbar, 100px up (the
+     height Netlify's badge takes on the other portfolio sites, so it sits in the same place on
+     all of them). The script shows it only on a page at least two screens tall, after half a
+     screen of scrolling. */
+  .to-top{position:fixed;right:16px;bottom:100px;z-index:20;width:44px;height:44px;padding:0;
+    display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);box-shadow:0 8px 24px -8px rgba(0,0,0,.6);
+    opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .2s ease,transform .2s ease,visibility .2s,border-color .18s ease;}
+  .to-top.is-shown{opacity:1;visibility:visible;transform:none;}
+  .to-top:hover{border-color:var(--muted);}
+  .to-top:focus-visible{outline:2px solid var(--acc);outline-offset:3px;}
+  .to-top svg{width:20px;height:20px;}
+  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto !important;}.to-top{transition:none;transform:none;}}
 </style>
 </head>
 <body id="top">
@@ -380,9 +388,12 @@
 <footer>
   <div class="wrap footer-inner">
     <span class="footer-name">Video Editor · MIT license</span>
-    <a href="#top" class="to-top">↑ Back to top</a>
   </div>
 </footer>
+
+<button type="button" class="to-top" id="toTop" aria-label="Back to top" title="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
 
 <script>
 // Real material metadata, read straight off the running app for this exact sample project.
@@ -552,6 +563,32 @@ renderPlan("travel_story");
   }, { threshold: 0.12 });
   els.forEach((el) => io.observe(el));
   setTimeout(() => els.forEach((el) => el.classList.add("is-visible")), 2000);
+})();
+
+// "Back to top": shown only on a page at least two screens tall, after half a screen of scrolling
+// (at the top, or on a short page, it would only be in the way). Checked again on scroll, resize and
+// any change in the page's height. A click scrolls up (instantly with reduced motion) and puts
+// keyboard focus on the first link, at the top.
+(function () {
+  const btn = document.getElementById("toTop");
+  if (!btn) return;
+  const shouldShow = (y, vh, ph) => ph >= vh * 2 && y >= vh / 2;
+  let queued = false;
+  const update = () => {
+    queued = false;
+    btn.classList.toggle("is-shown", shouldShow(window.scrollY, window.innerHeight, document.documentElement.scrollHeight));
+  };
+  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+  window.addEventListener("scroll", queue, { passive: true });
+  window.addEventListener("resize", queue);
+  if ("ResizeObserver" in window) new ResizeObserver(queue).observe(document.body);
+  btn.addEventListener("click", () => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    const first = document.querySelector(".brand");
+    if (first) first.focus({ preventScroll: true });
+  });
+  update();
 })();
 </script>
 </body>
